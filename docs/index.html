@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#171411" />
+  <meta name="description" content="VocFlow 是面向 Windows 的英语词汇、真题阅读与句式学习工具，支持 PDF 阅读、双击查词、划选分析、听力训练与本地学习数据管理。" />
+  <title>VocFlow - 英语词汇与真题阅读学习工具</title>
+  <link rel="icon" type="image/png" href="./assets/icon.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="VocFlow 首页">
+      <img src="./assets/icon.png" alt="" width="38" height="38" />
+      <span>VocFlow</span>
+    </a>
+    <nav aria-label="主导航">
+      <a href="#features">功能</a>
+      <a href="#download">下载</a>
+      <a href="#faq">常见问题</a>
+      <a id="repo-link" href="https://github.com/Apex9527xy/vocflow" rel="noreferrer">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">WINDOWS 10 / 11 · x64</span>
+        <h1>把每一次阅读，<br class="hero-break" />变成可积累的能力。</h1>
+        <p class="lead">VocFlow 将词汇、真题阅读、PDF 精读、听力训练与句式分析整理到同一个学习工作台，让查词、标注、复习和本地学习数据自然连在一起。</p>
+        <div class="hero-actions">
+          <a id="download-primary" class="button primary" href="https://github.com/Apex9527xy/vocflow/releases/latest">下载 Windows 版</a>
+          <a class="button secondary" href="#features">查看功能</a>
+        </div>
+        <div class="release-state" aria-live="polite">
+          <span class="pulse" aria-hidden="true"></span>
+          <span id="release-status">正在获取最新版本信息…</span>
+        </div>
+      </div>
+      <div class="hero-visual" aria-label="VocFlow 学习界面预览">
+        <div class="window-top"><span></span><span></span><span></span></div>
+        <div class="window-body">
+          <div class="side"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="workspace">
+            <div class="workspace-head"><span>学习概览</span><b>DAY 27</b></div>
+            <div class="metrics">
+              <article><strong>20</strong><span>今日学习</span></article>
+              <article><strong>12</strong><span>待复习</span></article>
+              <article><strong>42m</strong><span>专注时长</span></article>
+            </div>
+            <div class="progress-card">
+              <div><span>本周目标</span><strong>68%</strong></div>
+              <div class="progress"><i></i></div>
+            </div>
+            <div class="reading-card">
+              <span class="tag">精读训练</span>
+              <p>Understanding how vocabulary grows through context is the first step toward fluent reading.</p>
+              <div class="skeleton"></div><div class="skeleton short"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="section-heading">
+        <span class="eyebrow">LEARN WITH FOCUS</span>
+        <h2>为深度阅读而设计</h2>
+        <p>从真题到文献，把查词、标注、分析和复习放进同一条流畅的学习链路。</p>
+      </div>
+      <div class="feature-grid">
+        <article><span>01</span><h3>真题精读</h3><p>按年份、场次与考试类型整理试卷和解析，支持 PDF 阅读、听力控制与答案解析。</p></article>
+        <article><span>02</span><h3>双击查词</h3><p>阅读中双击任意单词即可查看释义、音标与例句，不必打断当前页面。</p></article>
+        <article><span>03</span><h3>句式分析</h3><p>准确划选局部句子，调用大模型分析结构、语法关系与表达重点。</p></article>
+        <article><span>04</span><h3>文献阅读</h3><p>打开 PDF、文献与讲义，在原文上完成高亮、下划线、笔记、绘图和补充文字。</p></article>
+        <article><span>05</span><h3>学习数据</h3><p>学习记录、词库和个人数据保存在本机，无需注册账号，也不会上传到云端。</p></article>
+        <article><span>06</span><h3>持续更新</h3><p>通过 GitHub Release 获取正式安装包，并在下载后使用 SHA256 校验文件完整性。</p></article>
+      </div>
+    </section>
+
+    <section id="download" class="download-panel">
+      <div>
+        <span class="eyebrow">DESKTOP RELEASE</span>
+        <h2>下载 VocFlow</h2>
+        <p id="download-description">Windows 正式安装包通过 GitHub Release 的 HTTPS 链接分发，并提供 SHA256 校验文件。</p>
+        <div class="download-actions">
+          <a id="download-secondary" class="button primary" href="https://github.com/Apex9527xy/vocflow/releases/latest">获取最新安装包</a>
+          <a id="checksum-link" class="text-link" href="https://github.com/Apex9527xy/vocflow/releases/latest">查看校验值</a>
+        </div>
+        <ul class="requirements">
+          <li>Windows 10 / 11（64 位）</li>
+          <li>建议 500 MB 以上可用空间</li>
+          <li>在线更新和大模型分析需要联网</li>
+        </ul>
+      </div>
+      <div class="download-badge">
+        <img src="./assets/icon.png" alt="VocFlow 图标" width="92" height="92" />
+        <strong id="latest-version">LATEST</strong>
+        <span>Windows Desktop</span>
+      </div>
+    </section>
+
+    <section id="faq" class="section faq">
+      <div class="section-heading compact">
+        <span class="eyebrow">FAQ</span>
+        <h2>常见问题</h2>
+      </div>
+      <details><summary>Windows 提示 SmartScreen 怎么办？</summary><p>应用尚未购买商业代码签名证书，可能出现提示。请确认安装包来自本站跳转的 GitHub Release，并用同目录的 SHA256 文件校验后运行。</p></details>
+      <details><summary>安装包会不会自动更新？</summary><p>会。客户端会从 VocFlow 云服务检查新版本，并在下载后完成校验与安装；也可以从 GitHub Release 手动下载最新版。</p></details>
+      <details><summary>哪些功能需要联网？</summary><p>在线更新和大模型分析需要网络；学习记录、词库和个人数据只保存在本机，已经打开的学习资料可以离线阅读。</p></details>
+    </section>
+  </main>
+
+  <footer>
+    <div class="brand small"><img src="./assets/icon.png" alt="" width="28" height="28" /><span>VocFlow</span></div>
+    <p>专注阅读，持续积累。</p>
+    <div><a href="https://github.com/Apex9527xy/vocflow/releases">版本发布</a><a href="https://github.com/Apex9527xy/vocflow/issues">问题反馈</a></div>
+  </footer>
+  <script src="./app.js" defer></script>
+</body>
+</html>
