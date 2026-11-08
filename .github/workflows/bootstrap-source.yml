@@ -24,7 +24,7 @@ jobs:
           git fetch ./vocflow-2.9.13.bundle refs/heads/main:refs/remotes/source/main --force
           git checkout refs/remotes/source/main -- .
           git checkout "$GITHUB_SHA" -- .github/workflows
-          git rm -f .github/workflows/release.yml
+          git rm -f .github/workflows/pages.yml .github/workflows/release.yml
           git add -A
           git commit -m "Release VocFlow 2.9.13 source"
       - name: Publish source
