@@ -1,0 +1,24 @@
+[Unit]
+Description=VocFlow Cloud API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vocflow
+Group=vocflow
+WorkingDirectory=/opt/vocflow/server
+EnvironmentFile=/etc/vocflow/vocflow-cloud.env
+ExecStart=/usr/bin/node /opt/vocflow/server/cloud-server.cjs
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vocflow-cloud
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

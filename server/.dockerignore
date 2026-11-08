@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+data/
+backups/
+*.zip
+*.sha256
+*.log
+node_modules/
+.git/
+Dockerfile
+docker-compose.yml
+README.md

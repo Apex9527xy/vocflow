@@ -1,0 +1,26 @@
+node_modules/
+node_modules.local/
+dist/
+dist-electron/
+release/
+.update-package/
+.update-package-verify/
+*.log
+.env
+.env.*
+!.env.example
+server/data/vocflow-cloud.json
+server/data/backups/
+server/data/updates/
+work/
+
+docs-preview-*.png
+
+# Local build caches and generated audits
+.electron-cache/
+.electron-builder-cache/
+.icon-audit-*/
+.tmp-*
+*.tmp
+icon-256-check.png
+server/data/

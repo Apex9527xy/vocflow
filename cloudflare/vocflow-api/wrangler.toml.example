@@ -1,0 +1,11 @@
+﻿name = "vocflow-api"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+routes = [
+  { pattern = "api.vocflow.cc.cd/*", zone_name = "vocflow.cc.cd" }
+]
+
+[vars]
+GITHUB_REPOSITORY = "Apex9527xy/vocflow"
+APP_UPDATE_MANIFEST_URL = "https://github.com/Apex9527xy/vocflow/releases/latest/download/update.json"

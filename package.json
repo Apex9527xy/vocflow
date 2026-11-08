@@ -1,0 +1,59 @@
+{
+  "name": "vocflow",
+  "version": "2.9.13",
+  "description": "VocFlow - 智能英语词汇与句式学习工具",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build && electron-builder",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit",
+    "build:main": "node scripts/build-main.cjs",
+    "build:renderer": "node scripts/build-renderer.cjs",
+    "build:unpacked": "node scripts/build-main.cjs && node scripts/build-renderer.cjs && electron-builder --win dir --publish never",
+    "package:update": "node scripts/package-update.cjs",
+    "version:bump": "node scripts/bump-version.cjs",
+    "cloud:serve": "node server/cloud-server.cjs",
+    "dist:user:nsis": "node scripts/build-user.cjs nsis",
+    "dist:user:msix": "node scripts/build-user-msix.cjs",
+    "release:update-feed": "node scripts/publish-update-feed.cjs",
+    "test:update-core": "node scripts/test-update-core.cjs",
+    "test:cloud": "node scripts/test-cloud-server.cjs",
+    "test:published-update": "node scripts/test-published-update.cjs",
+    "test:release": "node scripts/test-update-core.cjs && node scripts/test-release-guards.cjs && node scripts/test-cloud-server.cjs && node scripts/test-published-update.cjs",
+    "verify:cloud-endpoint": "node scripts/verify-cloud-endpoint.cjs",
+    "verify:published-update": "node scripts/verify-published-update.cjs",
+    "test:release-guard": "node scripts/test-release-guards.cjs",
+    "verify:site": "node scripts/verify-site.cjs"
+  },
+  "dependencies": {
+    "pdfjs-dist": "4.0.379",
+    "pinia": "^2.3.0",
+    "sql.js": "^1.12.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "vue-demi"
+    ]
+  },
+  "devDependencies": {
+    "@types/sql.js": "^1.4.4",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "electron": "^35.1.2",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.0",
+    "vite": "^6.2.0",
+    "vite-plugin-electron": "^0.28.8",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vue-tsc": "^2.2.0"
+  },
+  "productName": "VocFlow",
+  "author": "VocFlow",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@9.15.4"
+}

@@ -1,0 +1,42 @@
+services:
+  cloud:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      VOCFLOW_CLOUD_HOST: 0.0.0.0
+      VOCFLOW_CLOUD_DATA_DIR: /app/data
+      VOCFLOW_PUBLIC_URL: ${VOCFLOW_PUBLIC_URL:?Set VOCFLOW_PUBLIC_URL to the public HTTPS URL}
+      VOCFLOW_TRUST_PROXY: "1"
+      VOCFLOW_BACKUP_DIR: /app/data/backups
+      VOCFLOW_BACKUP_INTERVAL_MS: ${VOCFLOW_BACKUP_INTERVAL_MS:-900000}
+      VOCFLOW_BACKUP_RETENTION: ${VOCFLOW_BACKUP_RETENTION:-48}
+    expose:
+      - "8787"
+    volumes:
+      - vocflow-data:/app/data
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    depends_on:
+      cloud:
+        condition: service_healthy
+    environment:
+      VOCFLOW_DOMAIN: ${VOCFLOW_DOMAIN:?Set VOCFLOW_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  vocflow-data:
+  caddy-data:
+  caddy-config:

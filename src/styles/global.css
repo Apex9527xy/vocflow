@@ -1,0 +1,96 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: text;
+  line-height: 1.5;
+}
+
+/* Subtle dot pattern for depth */
+#app {
+  background-image: radial-gradient(rgba(44, 36, 32, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(44, 36, 32, 0.12);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(44, 36, 32, 0.2);
+}
+
+button:not(.option-btn),
+input,
+textarea,
+select,
+option {
+  user-select: none;
+}
+
+button {
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Display heading utility */
+.heading-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Per-page freehand canvas. It stays above PDF.js but below the reader chrome. */
+.pdf-ink-canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 5 !important;
+  display: block !important;
+  visibility: hidden;
+  pointer-events: none;
+  touch-action: none;
+}
+.segment-pdf-pane.ink-active .segment-pdf-text-layer,
+.reader-stage.ink-active .vocflow-pdf-text-layer {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Keep text interaction explicit when the freehand canvas is not active. */
+.segment-pdf-text-layer,
+.vocflow-pdf-text-layer {
+  pointer-events: auto;
+  user-select: text;
+}

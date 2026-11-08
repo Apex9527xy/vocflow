@@ -1,0 +1,85 @@
+extraMetadata:
+  buildEdition: user
+appId: com.vocflow.app
+productName: VocFlow
+asar: false
+npmRebuild: false
+copyright: Copyright © 2026 VocFlow
+directories:
+  output: release/user-nsis
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  executableName: VocFlow
+  legalTrademarks: VocFlow
+  signAndEditExecutable: true
+  icon: resources/icon.ico
+  artifactName: VocFlow-${version}-Setup.${ext}
+nsis:
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: VocFlow
+files:
+  - dist-electron
+  - dist
+  - resources/icon.png
+  - resources/icon.ico
+  - "!**/*.map"
+  - "!**/*.log"
+  - "!**/.env*"
+  - "!**/*.pdf"
+  - "!**/*.doc"
+  - "!**/*.docx"
+  - "!**/*.epub"
+  - "!**/*.mp3"
+  - "!**/*.wav"
+  - "!**/*.m4a"
+  - "!**/*.flac"
+  - "!**/*.mp4"
+  - "!**/*.mkv"
+  - "!**/*.csv"
+  - "!**/*.xlsx"
+  - "!**/*.db"
+  - "!**/*.sqlite"
+  - "!**/*.sqlite3"
+  - "!**/ExamLibrary/**"
+  - "!**/TtsAudioCache/**"
+  - "!**/local-cloud/**"
+  - "!**/README*"
+  - "!**/CHANGELOG*"
+  - "!**/CHANGES*"
+  - "!**/CONTRIBUTING*"
+  - "!**/CODE_OF_CONDUCT*"
+  - "!**/SECURITY*"
+  - "!**/documentation_index.md"
+  - "!**/node_modules/**/test/**"
+  - "!**/node_modules/**/tests/**"
+  - "!**/node_modules/**/__tests__/**"
+  - "!**/node_modules/**/example/**"
+  - "!**/node_modules/**/examples/**"
+  - "!**/node_modules/pdfjs-dist/**/web/images/**"
+  - "!**/node_modules/sql.js/logo.svg"
+extraResources:
+  - from: resources/wordbooks
+    to: wordbooks
+    filter:
+      - manifest.json
+      - cet4.json
+      - cet4-core.json
+      - cet6.json
+      - ielts.json
+      - kaoyan.json
+      - toefl.json
+
+
+
+
+
