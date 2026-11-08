@@ -149,8 +149,8 @@ if (target === 'nsis') {
   verifyPackagedBuild(path.join(root, 'release', 'user-nsis', 'win-unpacked', 'resources', 'app'))
   const bundled = verifyBundledResources(path.join(root, 'release', 'user-nsis', 'win-unpacked', 'resources'))
   console.log(`Bundled resources verified: ${bundled.topLevel.join(', ')}`)
-  const artifact = findLatest(path.join(root, 'release', 'user-nsis'), '.exe')
-  if (!artifact) throw new Error('NSIS artifact was not generated')
+  const artifact = path.join(root, 'release', 'user-nsis', `VocFlow-${pkg.version}-Setup.exe`)
+  if (!fs.existsSync(artifact)) throw new Error(`NSIS artifact was not generated: ${artifact}`)
   const iconAudit = verifyWindowsIcons({
     iconPng: path.join(root, 'resources', 'icon.png'),
     iconIco: path.join(root, 'resources', 'icon.ico'),
