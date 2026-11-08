@@ -92,7 +92,7 @@ function verifyBundledResources(resourcesRoot) {
   const root = path.resolve(resourcesRoot)
   assert(fs.existsSync(root) && fs.statSync(root).isDirectory(), `Bundled resources directory does not exist: ${root}`)
   const topLevel = fs.readdirSync(root).sort()
-  const allowedTopLevel = new Set(['app', 'elevate.exe', 'wordbooks'])
+  const allowedTopLevel = new Set(['app', 'app-update.yml', 'elevate.exe', 'wordbooks'])
   for (const entry of topLevel) {
     assert(allowedTopLevel.has(entry), `Unexpected bundled resource entry: ${entry}`)
   }
