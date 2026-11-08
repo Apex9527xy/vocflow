@@ -1,0 +1,65 @@
+name: Build and publish Windows release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      VOCFLOW_CLOUD_URL: ${{ vars.VOCFLOW_CLOUD_URL || 'https://api.vocflow.cc.cd' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag and cloud endpoint
+        shell: pwsh
+        run: |
+          if (-not $env:VOCFLOW_CLOUD_URL) { throw 'Repository variable VOCFLOW_CLOUD_URL is required.' }
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "v$((Get-Content package.json -Raw | ConvertFrom-Json).version)" }
+          node scripts/verify-release-version.cjs $tag
+
+      - name: Build production installer and update package
+        run: |
+          pnpm run dist:user:nsis
+          pnpm run package:update
+
+      - name: Publish GitHub release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = "v$version"
+          $assets = @(
+            "release/user-nsis/VocFlow-$version-Setup.exe",
+            "release/user-nsis/VocFlow-$version-Setup.exe.sha256",
+            "release/VocFlow-$version-update.zip",
+            "release/VocFlow-$version-update.zip.sha256",
+            "release/update.json"
+          )
+          foreach ($asset in $assets) {
+            if (-not (Test-Path $asset)) { throw "Missing release asset: $asset" }
+          }
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "VocFlow $version" --generate-notes
+          }
+          gh release upload $tag $assets --clobber
