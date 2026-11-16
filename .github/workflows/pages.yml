@@ -48,6 +48,7 @@ jobs:
 
       - name: Stage PWA under /app/
         run: |
+          rm -rf docs/app
           mkdir -p docs/app
           cp -R dist-mobile/. docs/app/
 
