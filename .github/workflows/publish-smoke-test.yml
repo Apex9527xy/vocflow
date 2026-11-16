@@ -1,0 +1,91 @@
+name: Publish smoke test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify public website
+        shell: bash
+        run: |
+          set -euo pipefail
+          checks=(
+            "https://vocflow.cc.cd/|html|VocFlow"
+            "https://vocflow.cc.cd/app/|html|VocFlow"
+            "https://vocflow.cc.cd/app/index.html|html|VocFlow"
+            "https://vocflow.cc.cd/app/manifest.webmanifest|manifest|VocFlow"
+            "https://vocflow.cc.cd/app/sw.js|javascript|"
+            "https://vocflow.cc.cd/app/icon.png|png|"
+          )
+          for entry in "${checks[@]}"; do
+            IFS='|' read -r url kind needle <<< "$entry"
+            code=""
+            for attempt in 1 2 3 4 5 6; do
+              code=$(curl -sS -L --connect-timeout 10 --max-time 30 -D headers.txt -o body.bin -w '%{http_code}' "$url" || true)
+              if [[ "$code" == "200" ]]; then
+                break
+              fi
+              echo "Retry $attempt for $url (HTTP $code)"
+              sleep 10
+            done
+            if [[ "$code" != "200" ]]; then
+              echo "FAILED: $url returned HTTP $code"
+              cat headers.txt || true
+              exit 1
+            fi
+            ctype=$(grep -i '^content-type:' headers.txt | tail -n 1 | tr -d '\r' | cut -d: -f2- | xargs)
+            case "$kind" in
+              html) [[ "$ctype" == *text/html* ]] || { echo "Unexpected content type for $url: $ctype"; exit 1; } ;;
+              manifest) [[ "$ctype" == *manifest+json* || "$ctype" == *application/json* ]] || { echo "Unexpected content type for $url: $ctype"; exit 1; } ;;
+              javascript) [[ "$ctype" == *javascript* ]] || { echo "Unexpected content type for $url: $ctype"; exit 1; } ;;
+              png) [[ "$ctype" == *image/png* ]] || { echo "Unexpected content type for $url: $ctype"; exit 1; } ;;
+            esac
+            if [[ -n "$needle" ]]; then
+              grep -aFq "$needle" body.bin || { echo "Expected content missing from $url"; exit 1; }
+            fi
+            if [[ "$kind" == "png" ]]; then
+              signature=$(od -An -tx1 -N8 body.bin | tr -d ' \n')
+              [[ "$signature" == "89504e470d0a1a0a" ]] || { echo "Invalid PNG signature at $url"; exit 1; }
+            fi
+            echo "OK: $url | HTTP $code | Content-Type: $ctype"
+          done
+
+      - name: Verify release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/Apex9527xy/vocflow/releases/tags/v2.9.14"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api_url" > release.json
+          jq -e '.tag_name == "v2.9.14" and .draft == false and .prerelease == false' release.json > /dev/null
+          cat > expected.tsv <<'EOF'
+          VocFlow-2.9.14-Setup.exe	132933633
+          VocFlow-2.9.14-Setup.exe.sha256	91
+          VocFlow-2.9.14-update.zip	49497375
+          VocFlow-2.9.14-update.zip.sha256	92
+          VocFlow-2.9.14-android.apk	3878765
+          VocFlow-2.9.14-android.apk.sha256	93
+          VocFlow-2.9.14-ios-unsigned.ipa	972444
+          VocFlow-2.9.14-ios-unsigned.ipa.sha256	98
+          VocFlow-2.9.14-pwa.zip	455217
+          VocFlow-2.9.14-pwa.zip.sha256	89
+          update.json	44798
+          EOF
+          while IFS=$'\t' read -r name expected_size; do
+            [[ -n "$name" ]] || continue
+            row=$(jq -r --arg name "$name" '.assets[] | select(.name == $name) | [.state, .size, .browser_download_url] | @tsv' release.json)
+            [[ -n "$row" ]] || { echo "Missing release asset: $name"; exit 1; }
+            IFS=$'\t' read -r state actual_size download_url <<< "$row"
+            [[ "$state" == "uploaded" ]] || { echo "Asset not uploaded: $name ($state)"; exit 1; }
+            [[ "$actual_size" == "$expected_size" ]] || { echo "Size mismatch for $name: expected $expected_size, got $actual_size"; exit 1; }
+            code=$(curl -sS -L --range 0-0 --connect-timeout 10 --max-time 90 -o /dev/null -w '%{http_code}' "$download_url")
+            [[ "$code" == "200" || "$code" == "206" ]] || { echo "Download failed for $name: HTTP $code"; exit 1; }
+            echo "OK: $name | $actual_size bytes | HTTP $code"
+          done < expected.tsv
