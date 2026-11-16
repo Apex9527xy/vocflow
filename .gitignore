@@ -26,7 +26,6 @@ icon-256-check.png
 server/data/
 
 dist-mobile/
-docs/app/
 icons/
 scripts/patch-node-os.cjs
 android/app/*.jks
