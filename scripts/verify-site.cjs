@@ -1,4 +1,4 @@
-﻿const fs = require('node:fs')
+const fs = require('node:fs')
 const path = require('node:path')
 
 const root = process.cwd()
@@ -32,8 +32,12 @@ const pagesWorkflow = fs.readFileSync(path.join(root, '.github/workflows/pages.y
 assert(/releases\/latest/.test(html), 'The website must provide a latest-release fallback link.')
 assert(app.includes("const repository = 'Apex9527xy/vocflow'") && app.includes('/releases/latest'), 'The website must query the configured GitHub repository.')
 assert(app.includes('-Setup\\.exe'), 'The website must identify the Windows installer release asset.')
+assert(app.includes('-android\\.apk'), 'The website must identify the Android APK release asset.')
+assert(app.includes('-ios-unsigned\\.ipa'), 'The website must identify the unsigned iPhone IPA release asset.')
 assert(/VOCFLOW_CLOUD_URL/.test(releaseWorkflow), 'Release workflow must receive VOCFLOW_CLOUD_URL.')
 assert(/package:update/.test(releaseWorkflow), 'Release workflow must generate update.json and the update ZIP.')
+assert(/assembleRelease/.test(releaseWorkflow), 'Release workflow must build the Android APK.')
+assert(/CODE_SIGNING_ALLOWED=NO/.test(releaseWorkflow), 'Release workflow must build an unsigned iPhone IPA.')
 assert(/actions\/deploy-pages/.test(pagesWorkflow), 'Pages workflow must deploy the static website.')
 const readableFiles = [
   ['docs/index.html', html],

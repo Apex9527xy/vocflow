@@ -94,3 +94,42 @@ button:focus-visible {
   pointer-events: auto;
   user-select: text;
 }
+
+
+/* Mobile/PWA shell */
+html.vocflow-mobile,
+html.vocflow-mobile body,
+html.vocflow-mobile #app {
+  min-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html.vocflow-mobile body {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+@media (max-width: 720px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  .word-lookup-card,
+  .sentence-lookup-card {
+    left: max(8px, env(safe-area-inset-left)) !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    top: max(8px, env(safe-area-inset-top)) !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    max-height: none !important;
+    border-radius: 14px;
+  }
+
+  .lookup-canvas,
+  .sentence-canvas {
+    max-height: none !important;
+  }
+}

@@ -1,7 +1,7 @@
-import { createRouter, createMemoryHistory } from 'vue-router'
+import { createRouter, createMemoryHistory, createWebHashHistory } from 'vue-router'
 
 const router = createRouter({
-  history: createMemoryHistory(),
+  history: __VOCFLOW_MOBILE__ ? createWebHashHistory() : createMemoryHistory(),
   routes: [
     {
       path: '/',

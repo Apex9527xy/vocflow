@@ -59,5 +59,26 @@ const uiStore = useUiStore()
   padding: 32px 40px;
   position: relative;
   z-index: 1;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 720px) {
+  .app-layout {
+    display: block;
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+
+  .window-drag-region {
+    display: none;
+  }
+
+  .main-content {
+    height: 100dvh;
+  }
+
+  .content-scroll {
+    padding: 16px 12px calc(82px + env(safe-area-inset-bottom));
+  }
 }
 </style>

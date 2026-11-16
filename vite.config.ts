@@ -32,6 +32,7 @@ function copyPreload(): import('vite').Plugin {
 export default defineConfig({
   define: {
     __VOCFLOW_USER_BUILD__: JSON.stringify(userBuild),
+    __VOCFLOW_MOBILE__: JSON.stringify(false),
     __VOCFLOW_CLOUD_ENDPOINT_JSON__: JSON.stringify(cloudEndpoint)
   },
   plugins: [

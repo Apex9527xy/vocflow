@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '../../stores/ui.store'
 
@@ -11,7 +11,14 @@ interface NavItem {
 
 const route = useRoute()
 const uiStore = useUiStore()
-const brandIconUrl = new URL('./assets/icon.png', window.location.href).href
+const brandIconUrl = new URL('./icon.png', window.location.href).href
+const mobileQuery = window.matchMedia('(max-width: 720px)')
+const isMobile = ref(mobileQuery.matches)
+function syncMobileLayout(event: MediaQueryListEvent): void {
+  isMobile.value = event.matches
+}
+onMounted(() => mobileQuery.addEventListener('change', syncMobileLayout))
+onUnmounted(() => mobileQuery.removeEventListener('change', syncMobileLayout))
 const navOrderKey = 'vocflow-nav-order'
 
 const defaultNavItems: NavItem[] = [
@@ -98,10 +105,10 @@ function handleNavClick(event: MouseEvent, item: NavItem): void {
 }</script>
 
 <template>
-  <nav class="sidenav" :class="{ collapsed: uiStore.sidebarCollapsed }">
+  <nav class="sidenav" :class="{ collapsed: uiStore.sidebarCollapsed && !isMobile, mobile: isMobile }">
     <div class="nav-brand">
       <img class="brand-mark" :src="brandIconUrl" alt="VocFlow" />
-      <div v-if="!uiStore.sidebarCollapsed" class="brand-text">
+      <div v-if="!uiStore.sidebarCollapsed || isMobile" class="brand-text">
         <span class="brand-title">VocFlow</span>
         <span class="brand-sub">智能词汇学习</span>
       </div>
@@ -113,7 +120,7 @@ function handleNavClick(event: MouseEvent, item: NavItem): void {
         :key="item.path"
         :to="item.path"
         class="nav-item"
-        draggable="true"
+        :draggable="!isMobile"
         title="拖动可调整顺序"
         :class="{
           active: item.path === '/exam' ? route.path.startsWith('/exam') : route.path === item.path,
@@ -128,7 +135,7 @@ function handleNavClick(event: MouseEvent, item: NavItem): void {
         @dragend.stop="handleDragEnd"
       >
         <span class="nav-icon">{{ item.icon }}</span>
-        <span v-if="!uiStore.sidebarCollapsed" class="nav-label">{{ item.label }}</span>
+        <span v-if="!uiStore.sidebarCollapsed || isMobile" class="nav-label">{{ item.label }}</span>
       </router-link>
     </div>
 
@@ -313,5 +320,80 @@ function handleNavClick(event: MouseEvent, item: NavItem): void {
 
 .collapse-chevron.rotated {
   transform: rotate(180deg);
+}
+
+@media (max-width: 720px) {
+  .sidenav,
+  .sidenav.collapsed {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9000;
+    width: 100%;
+    min-width: 0;
+    height: calc(68px + env(safe-area-inset-bottom));
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-top: 1px solid var(--glass-border);
+    background: color-mix(in srgb, var(--bg-card) 94%, transparent);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 -8px 28px rgba(44, 36, 32, 0.08);
+  }
+
+  .sidenav::before,
+  .nav-brand,
+  .nav-footer {
+    display: none;
+  }
+
+  .nav-items {
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+
+  .nav-items::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-item {
+    flex: 0 0 64px;
+    min-width: 64px;
+    height: 54px;
+    padding: 4px 3px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  .nav-item.active::before {
+    left: 50%;
+    top: 0;
+    width: 24px;
+    height: 2px;
+    transform: translateX(-50%);
+  }
+
+  .nav-icon {
+    width: auto;
+    font-size: 16px;
+    line-height: 1.2;
+  }
+
+  .nav-label {
+    width: 100%;
+    overflow: hidden;
+    font-size: 10px;
+    line-height: 1.2;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 </style>

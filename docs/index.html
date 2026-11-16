@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#171411" />
-  <meta name="description" content="VocFlow 是面向 Windows 的英语词汇、真题阅读与句式学习工具，支持 PDF 阅读、双击查词、划选分析、听力训练与本地学习数据管理。" />
-  <title>VocFlow - 英语词汇与真题阅读学习工具</title>
+  <meta name="description" content="VocFlow 是面向 Windows、Android 和 iPhone 的英语词汇、真题阅读与句式学习工具，支持查词、划选分析、词根词缀与本地学习数据管理。" />
+  <title>VocFlow - 英语词汇与句式学习工具</title>
   <link rel="icon" type="image/png" href="./assets/icon.png" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -26,11 +26,11 @@
   <main>
     <section class="hero">
       <div class="hero-copy">
-        <span class="eyebrow">WINDOWS 10 / 11 · x64</span>
+        <span class="eyebrow">WINDOWS · ANDROID · IPHONE</span>
         <h1>把每一次阅读，<br class="hero-break" />变成可积累的能力。</h1>
-        <p class="lead">VocFlow 将词汇、真题阅读、PDF 精读、听力训练与句式分析整理到同一个学习工作台，让查词、标注、复习和本地学习数据自然连在一起。</p>
+        <p class="lead">VocFlow 将词汇、真题阅读、PDF 精读、句式分析与词根词缀整理到同一个学习工作台。桌面端完整离线，手机端可安装 APK、自签 IPA，或直接使用免签名 PWA。</p>
         <div class="hero-actions">
-          <a id="download-primary" class="button primary" href="https://github.com/Apex9527xy/vocflow/releases/latest">下载 Windows 版</a>
+          <a class="button primary" href="#download">选择下载版本</a>
           <a class="button secondary" href="#features">查看功能</a>
         </div>
         <div class="release-state" aria-live="polite">
@@ -72,32 +72,63 @@
       <div class="feature-grid">
         <article><span>01</span><h3>真题精读</h3><p>按年份、场次与考试类型整理试卷和解析，支持 PDF 阅读、听力控制与答案解析。</p></article>
         <article><span>02</span><h3>双击查词</h3><p>阅读中双击任意单词即可查看释义、音标与例句，不必打断当前页面。</p></article>
-        <article><span>03</span><h3>句式分析</h3><p>准确划选局部句子，调用大模型分析结构、语法关系与表达重点。</p></article>
-        <article><span>04</span><h3>文献阅读</h3><p>打开 PDF、文献与讲义，在原文上完成高亮、下划线、笔记、绘图和补充文字。</p></article>
-        <article><span>05</span><h3>学习数据</h3><p>学习记录、词库和个人数据保存在本机，无需注册账号，也不会上传到云端。</p></article>
-        <article><span>06</span><h3>持续更新</h3><p>通过 GitHub Release 获取正式安装包，并在下载后使用 SHA256 校验文件完整性。</p></article>
+        <article><span>03</span><h3>句式与词根</h3><p>准确划选局部句子，调用大模型分析结构；词根词缀支持在线补全与自定义来源。</p></article>
+        <article><span>04</span><h3>文献标注</h3><p>打开 PDF、文献与讲义，在原文上完成高亮、下划线、笔记、绘图和补充文字。</p></article>
+        <article><span>05</span><h3>多端学习</h3><p>Windows 桌面完整版、Android APK、iPhone 未签名 IPA 与免签名 PWA 共用核心学习能力。</p></article>
+        <article><span>06</span><h3>本地优先</h3><p>学习记录、词库和个人设置保存在设备本机，无需注册账号，也不会上传到 VocFlow 服务器。</p></article>
       </div>
     </section>
 
-    <section id="download" class="download-panel">
-      <div>
-        <span class="eyebrow">DESKTOP RELEASE</span>
-        <h2>下载 VocFlow</h2>
-        <p id="download-description">Windows 正式安装包通过 GitHub Release 的 HTTPS 链接分发，并提供 SHA256 校验文件。</p>
-        <div class="download-actions">
-          <a id="download-secondary" class="button primary" href="https://github.com/Apex9527xy/vocflow/releases/latest">获取最新安装包</a>
-          <a id="checksum-link" class="text-link" href="https://github.com/Apex9527xy/vocflow/releases/latest">查看校验值</a>
+    <section id="download" class="download-panel platform-download">
+      <div class="download-heading">
+        <span class="eyebrow">OFFICIAL RELEASE</span>
+        <h2>选择你的设备</h2>
+        <p id="download-description">安装包通过 GitHub Release 的 HTTPS 链接分发，并提供 SHA256 校验文件。</p>
+      </div>
+
+      <div class="platform-grid">
+        <article class="platform-card">
+          <div class="platform-card-head"><span class="platform-label">WINDOWS</span><span>10 / 11 · x64</span></div>
+          <h3>桌面完整版</h3>
+          <p>包含真题与文献 PDF 管理、听力、文件夹监听和本地 Ollama 等完整桌面能力。</p>
+          <div class="platform-actions">
+            <a id="download-primary" class="button primary" href="https://github.com/Apex9527xy/vocflow/releases/latest">下载 Windows 安装包</a>
+            <a id="checksum-link" class="text-link" href="https://github.com/Apex9527xy/vocflow/releases/latest">SHA256 校验值</a>
+          </div>
+        </article>
+
+        <article class="platform-card">
+          <div class="platform-card-head"><span class="platform-label">ANDROID</span><span>Android 7.0+</span></div>
+          <h3>Android APK</h3>
+          <p>安装后可直接使用 CET4 核心词书、复习、查词、句式分析、词根词缀与学习统计。</p>
+          <div class="platform-actions">
+            <a id="download-android" class="button primary" href="https://github.com/Apex9527xy/vocflow/releases/latest">下载 Android APK</a>
+            <a id="checksum-android" class="text-link" href="https://github.com/Apex9527xy/vocflow/releases/latest">SHA256 校验值</a>
+          </div>
+        </article>
+
+        <article class="platform-card">
+          <div class="platform-card-head"><span class="platform-label">IPHONE</span><span>iOS 15+</span></div>
+          <h3>iPhone 安装包</h3>
+          <p>IPA 为未签名包，可通过爱思助手使用 Apple ID 自签安装；也可直接使用免签名 PWA。</p>
+          <div class="platform-actions">
+            <a id="download-ios" class="button primary" href="https://github.com/Apex9527xy/vocflow/releases/latest">下载未签名 IPA</a>
+            <a id="checksum-ios" class="text-link" href="https://github.com/Apex9527xy/vocflow/releases/latest">SHA256 校验值</a>
+            <a id="open-pwa" class="button secondary" href="./app/">使用 iPhone PWA</a>
+          </div>
+        </article>
+      </div>
+
+      <div class="download-foot">
+        <div class="download-badge">
+          <img src="./assets/icon.png" alt="VocFlow 图标" width="72" height="72" />
+          <div><strong id="latest-version">LATEST</strong><span>Windows · Android · iPhone</span></div>
         </div>
         <ul class="requirements">
-          <li>Windows 10 / 11（64 位）</li>
-          <li>建议 500 MB 以上可用空间</li>
-          <li>在线更新和大模型分析需要联网</li>
+          <li>安装前建议核对 SHA256</li>
+          <li>大模型分析需要联网并配置个人 API</li>
+          <li>学习数据默认仅保存在设备本地</li>
         </ul>
-      </div>
-      <div class="download-badge">
-        <img src="./assets/icon.png" alt="VocFlow 图标" width="92" height="92" />
-        <strong id="latest-version">LATEST</strong>
-        <span>Windows Desktop</span>
       </div>
     </section>
 
@@ -106,9 +137,10 @@
         <span class="eyebrow">FAQ</span>
         <h2>常见问题</h2>
       </div>
-      <details><summary>Windows 提示 SmartScreen 怎么办？</summary><p>应用尚未购买商业代码签名证书，可能出现提示。请确认安装包来自本站跳转的 GitHub Release，并用同目录的 SHA256 文件校验后运行。</p></details>
-      <details><summary>安装包会不会自动更新？</summary><p>会。客户端会从 VocFlow 云服务检查新版本，并在下载后完成校验与安装；也可以从 GitHub Release 手动下载最新版。</p></details>
-      <details><summary>哪些功能需要联网？</summary><p>在线更新和大模型分析需要网络；学习记录、词库和个人数据只保存在本机，已经打开的学习资料可以离线阅读。</p></details>
+      <details><summary>iPhone 如何安装未签名 IPA？</summary><p>在电脑安装爱思助手，连接 iPhone，使用自己的 Apple ID 对下载的 IPA 进行签名后安装。免费 Apple ID 的签名通常约 7 天到期，到期后需要重新签名；不愿重签可直接使用页面中的 PWA。</p></details>
+      <details><summary>Android 提示未知来源或 Play Protect 怎么办？</summary><p>VocFlow 通过 GitHub Release 侧载分发，未上架应用商店。请确认安装包来自本站跳转的 GitHub Release，并先核对同目录的 SHA256 文件，再允许当前浏览器或文件管理器安装。</p></details>
+      <details><summary>Windows 提示 SmartScreen 怎么办？</summary><p>应用尚未购买商业代码签名证书，可能出现提示。请确认安装包来自本站跳转的 GitHub Release，并用 SHA256 文件校验后运行。</p></details>
+      <details><summary>哪些功能会使用网络？</summary><p>在线查词、翻译和大模型分析需要网络；学习记录、词库和个人设置保存在设备本地。本地 Ollama、文件夹监听和桌面 PDF 管理仍仅限 Windows。</p></details>
     </section>
   </main>
 
