@@ -842,6 +842,29 @@ onUnmounted(() => {
   scroll-behavior: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
+  scrollbar-gutter: stable;
+}
+
+/* 文献阅读器：保证垂直滚动条在桌面与移动端都可见、可拖拽 */
+.reader-stage::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.reader-stage::-webkit-scrollbar-track {
+  background: rgba(44, 36, 32, 0.06);
+  border-radius: 6px;
+}
+.reader-stage::-webkit-scrollbar-thumb {
+  background: rgba(44, 36, 32, 0.28);
+  border-radius: 6px;
+  border: 2px solid #e9e5df;
+}
+.reader-stage::-webkit-scrollbar-thumb:hover {
+  background: rgba(44, 36, 32, 0.45);
+}
+.reader-stage {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(44, 36, 32, 0.28) rgba(44, 36, 32, 0.06);
 }
 .reader-state {
   min-height: 60vh;

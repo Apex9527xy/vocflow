@@ -104,6 +104,7 @@ function addStyle(css, key) {
 function transpile(code, id) {
   code = stripDeveloperBlocks(code)
     .replaceAll('__VOCFLOW_USER_BUILD__', USER_BUILD ? 'true' : 'false')
+    .replaceAll('__VOCFLOW_MOBILE__', 'false')
     .replaceAll('__VOCFLOW_CLOUD_ENDPOINT_JSON__', JSON.stringify(CLOUD_ENDPOINT))
   const result = typescript.transpileModule(code, {
     fileName: id,

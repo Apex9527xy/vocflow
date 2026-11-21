@@ -40,7 +40,7 @@ defineExpose({ flip, speak })
       </div>
       <div class="card-back">
         <div class="word-display small">{{ word }}</div>
-        <div class="meaning-display">{{ meaning }}</div>
+        <div class="meaning-display">{{ meaning || '暂无释义，请在查词中补充' }}</div>
         <div v-if="example" class="example-display">{{ example }}</div>
       </div>
     </div>
@@ -97,6 +97,11 @@ defineExpose({ flip, speak })
 
 .card-back {
   transform: rotateY(180deg);
+}
+
+/* 翻面后背面内容保持正向可读，避免出现镜像/颠倒文字 */
+.card-back > * {
+  transform: translateZ(0);
 }
 
 .word-display {

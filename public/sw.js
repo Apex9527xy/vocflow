@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vocflow-mobile-v2.9.14'
+const CACHE_NAME = 'vocflow-mobile-v2.9.15'
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icon.png']
 
 self.addEventListener('install', event => {

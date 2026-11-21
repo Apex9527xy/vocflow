@@ -77,8 +77,20 @@ async function playAudioElement(audio: HTMLAudioElement, rate: number, onStarted
 
 async function playDirectOnline(text: string, accent: PronunciationAccent, rate: number, onStarted?: PlaybackStarted): Promise<void> {
   stopWordPronunciation()
-  const audio = new Audio(text.includes(' ') || text.length > 24 ? sentencePronunciationUrl(text, accent) : wordPronunciationUrl(text, accent))
-  await playAudioElement(audio, rate, onStarted)
+  const urls = text.includes(' ') || text.length > 24
+    ? [sentencePronunciationUrl(text, accent)]
+    : [wordPronunciationUrl(text, accent), sentencePronunciationUrl(text, accent)]
+  // 单词发音：有道与 Google 直连并行竞速，谁先开始播放就用谁，避免逐个排队等待。
+  if (urls.length === 1) {
+    const audio = new Audio(urls[0])
+    await playAudioElement(audio, rate, onStarted)
+    return
+  }
+  const attempts = urls.map(async (url) => {
+    const audio = new Audio(url)
+    await playAudioElement(audio, rate, onStarted)
+  })
+  await Promise.any(attempts)
 }
 
 async function playFetchedOnline(text: string, accent: PronunciationAccent, rate: number, onStarted?: PlaybackStarted): Promise<void> {
@@ -106,15 +118,15 @@ async function playFetchedOnline(text: string, accent: PronunciationAccent, rate
 
 async function playOnlineText(text: string, accent: PronunciationAccent, rate: number, onStarted?: PlaybackStarted): Promise<void> {
   let fetchedError: Error | null = null
-  try {
-    // 主进程会先检查磁盘缓存，再请求女声风格在线 TTS，避免每次等待直连音频。
-    await playFetchedOnline(text, accent, rate, onStarted)
-    return
-  } catch (error) {
-    fetchedError = error as Error
-  }
+  // 浏览器直连音频不经过主进程 IPC，延迟最低；先并行直连，失败后再回退主进程云端 TTS。
   try {
     await playDirectOnline(text, accent, rate, onStarted)
+    return
+  } catch (directError) {
+    fetchedError = directError as Error
+  }
+  try {
+    await playFetchedOnline(text, accent, rate, onStarted)
   } catch {
     throw fetchedError || new Error('发音加载失败，请检查网络')
   }

@@ -741,6 +741,8 @@ function runMigrations(db: SqlJsDatabase): void {
       created_at TEXT DEFAULT (datetime('now'))
     )
   `)
+  ensureColumn(db, 'daily_stats', 'is_completed', 'INTEGER DEFAULT 0')
+  ensureColumn(db, 'daily_stats', 'completed_at', 'TEXT')
   db.run('CREATE INDEX IF NOT EXISTS idx_reading_topic ON reading_passages(topic)')
 
   // 翻译句子

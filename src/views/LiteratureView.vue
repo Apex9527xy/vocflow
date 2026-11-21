@@ -2,6 +2,9 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { LITERATURE_SITES } from '../data/literatureSites'
 import LiteratureReader from '../components/LiteratureReader.vue'
+import { isMobileBuild } from '../mobile/isMobile'
+
+const mobile = computed(() => isMobileBuild())
 
 const storagePath = ref('')
 const selectedSiteId = ref(LITERATURE_SITES[0].id)
@@ -308,7 +311,12 @@ onUnmounted(() => {
       <div class="literature-count">{{ literatureItems.length }} 篇文献</div>
     </div>
 
-    <section class="path-panel">
+    <section v-if="mobile" class="mobile-notice">
+      <strong>手机端暂不支持本地 PDF 导入与内置文献库</strong>
+      <p>文献的本地导入、PDF 标注与摘录需要桌面端文件系统支持。你可以在下方选择在线文献站点，用浏览器检索阅读；完整文献功能请使用 Windows 桌面版。</p>
+    </section>
+
+    <section v-if="!mobile" class="path-panel">
       <div class="path-label-row">
         <span>自定义路径导入 PDF</span>
         <small>自动扫描该路径及其子文件夹中新出现的 PDF 文件</small>
@@ -339,7 +347,7 @@ onUnmounted(() => {
 
     <div v-if="notice" class="literature-notice">{{ notice }}</div>
 
-    <section class="library-panel">
+    <section v-if="!mobile" class="library-panel">
       <div class="library-heading">
         <div>
           <div class="section-kicker">SAVED LITERATURE</div>
@@ -429,6 +437,15 @@ onUnmounted(() => {
   background: var(--bg-card);
   box-shadow: var(--shadow-card);
 }
+.mobile-notice {
+  margin-bottom: 15px;
+  padding: 16px 18px;
+  border: 1px solid rgba(217,119,6,.22);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, rgba(217,119,6,.08), var(--bg-card) 70%);
+}
+.mobile-notice strong { display: block; color: var(--accent-dim); font-size: 14px; margin-bottom: 6px; }
+.mobile-notice p { color: var(--text-secondary); font-size: 12.5px; line-height: 1.7; }
 .path-panel { width: min(760px, 100%); margin-left: auto; margin-right: auto; }
 .path-label-row { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin-bottom: 8px; }
 .path-label-row span { color: var(--text-primary); font-size: 12px; font-weight: 700; }

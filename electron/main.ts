@@ -200,6 +200,18 @@ function revealMainWindow(window: BrowserWindow): void {
   }, wait)
 }
 
+function renderFallbackError(window: BrowserWindow, detail: string): void {
+  if (window.isDestroyed()) return
+  const safe = String(detail || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch))
+  window.webContents.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(`<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"/><title>VocFlow 启动失败</title><style>
+    *{box-sizing:border-box}html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#faf8f5;color:#2c2420;font-family:"Segoe UI","Microsoft YaHei",sans-serif;padding:32px}
+    .card{max-width:520px;border:1px solid rgba(44,36,32,.12);border-radius:16px;background:#fff;padding:28px;box-shadow:0 12px 36px rgba(44,36,32,.12)}
+    h1{font-size:18px;margin:0 0 10px}p{font-size:13px;line-height:1.7;color:#5f554e}code{display:block;margin-top:12px;padding:10px;border-radius:8px;background:#f4f1ec;font-size:12px;white-space:pre-wrap;word-break:break-word}
+  </style></head><body><div class="card"><h1>VocFlow 未能正常加载界面</h1><p>请尝试关闭后重新启动；若问题持续，可备份用户目录中的数据库后重装最新版本。</p><code>${safe}</code></div></body></html>`)}`).catch(() => {})
+  if (!window.isVisible()) window.show()
+  if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close()
+}
+
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1200,
@@ -237,8 +249,17 @@ function createWindow(): BrowserWindow {
   window.webContents.once('did-finish-load', () => {
     setTimeout(reveal, 8500)
   })
-  window.webContents.once('did-fail-load', (_event, _code, _description, _url, isMainFrame) => {
-    if (isMainFrame) reveal()
+  window.webContents.once('did-fail-load', (_event, code, description, _url, isMainFrame) => {
+    if (isMainFrame) {
+      renderFallbackError(window, `主界面加载失败 (${code}): ${description || '未知错误'}`)
+    }
+  })
+  // 渲染进程崩溃或脱离时，不再停在空白窗口。
+  window.webContents.on('render-process-gone', (_event, details) => {
+    renderFallbackError(window, `渲染进程已退出: ${details.reason || 'unknown'}`)
+  })
+  window.webContents.on('unresponsive', () => {
+    renderFallbackError(window, '界面响应超时，请重启应用。')
   })
   window.on('closed', () => {
     mainWindow = null

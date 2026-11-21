@@ -321,7 +321,8 @@ function createApi(): Record<string, any> {
   api.lookupWordOnline = onlineLookup
   api.translateSelection = translateSentences
   api.requestSentenceAi = requestSentenceAi
-  api.fetchTtsAudio = async () => ({ success: false, message: '请使用浏览器在线发音' })
+  // 手机/网页端没有主进程 TTS：返回失败即可，渲染层会自动回退到浏览器直连音频播放。
+  api.fetchTtsAudio = async () => ({ success: false, message: '浏览器在线发音' })
   api.listSentenceLocalModels = async () => ({ success: false, ollamaAvailable: false, installed: [], message: '手机端不支持本地 Ollama' })
   api.downloadSentenceLocalModel = async () => ({ success: false, message: '手机端不支持本地 Ollama' })
   api.installSentenceOllama = async () => ({ success: false, message: '手机端不支持本地 Ollama' })
