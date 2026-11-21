@@ -1,7 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
-const { zipDirectory, unzipToDir, listZipEntries } = require('./zip-utils.cjs')
+const { zipDirectory, unzipToDir } = require('./zip-utils.cjs')
 const { resolveCloudEndpoint } = require('./cloud-endpoint.cjs')
 const { verifyPackagedUserBuild } = require('./verify-packaged-user-build.cjs')
 
@@ -51,26 +51,11 @@ try {
   fs.mkdirSync(path.dirname(staging), { recursive: true })
   fs.cpSync(source, staging, { recursive: true })
 
-  const entryCount = zipDirectory(payloadRoot, zipPath)
+  const entryCount = zipDirectory(stagingRoot, zipPath)
   assert(entryCount > 0, 'Update ZIP has no files')
   assert(fs.existsSync(zipPath) && fs.statSync(zipPath).size > 0, 'Update ZIP was not generated or is empty')
 
-  const entries = listZipEntries(zipPath)
-  console.log(`Update ZIP entries: ${entries.length}; first: ${entries[0]?.name || '(none)'}`)
-  const extracted = unzipToDir(zipPath, verifyRoot)
-  console.log(`Extracted files: ${extracted}; verifyRoot exists: ${fs.existsSync(verifyRoot)}`)
-  if (fs.existsSync(verifyRoot)) {
-    const probe = []
-    const walk = (d, depth) => {
-      if (depth > 2) return
-      for (const n of fs.readdirSync(d)) {
-        probe.push(path.relative(verifyRoot, path.join(d, n)))
-        if (fs.statSync(path.join(d, n)).isDirectory()) walk(path.join(d, n), depth + 1)
-      }
-    }
-    walk(verifyRoot, 0)
-    console.log(`Verify tree (depth<=2): ${probe.slice(0, 30).join(' | ')}`)
-  }
+  unzipToDir(zipPath, verifyRoot)
   verifyPackagedUserBuild(path.join(verifyRoot, 'payload', 'resources', 'app'), {
     expectedVersion: pkg.version,
     expectedEndpoint: cloudEndpoint

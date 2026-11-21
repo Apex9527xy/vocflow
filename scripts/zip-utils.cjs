@@ -105,23 +105,6 @@ function zipDirectory(srcDir, zipFile) {
   return entries.length
 }
 
-function listZipEntries(zipFile) {
-  const buf = fs.readFileSync(zipFile)
-  const entries = []
-  let p = 0
-  while (p + 4 <= buf.length && buf.readUInt32LE(p) === 0x04034b50) {
-    const method = buf.readUInt16LE(p + 8)
-    const compSize = buf.readUInt32LE(p + 18)
-    const nameLen = buf.readUInt16LE(p + 26)
-    const extraLen = buf.readUInt16LE(p + 28)
-    const name = buf.toString('utf8', p + 30, p + 30 + nameLen)
-    const dataStart = p + 30 + nameLen + extraLen
-    entries.push({ name, method, compSize })
-    p = dataStart + compSize
-  }
-  return entries
-}
-
 function unzipToDir(zipFile, destDir) {
   const buf = fs.readFileSync(zipFile)
   let p = 0
@@ -148,4 +131,4 @@ function unzipToDir(zipFile, destDir) {
   return extracted
 }
 
-module.exports = { zipDirectory, unzipToDir, listZipEntries }
+module.exports = { zipDirectory, unzipToDir }
