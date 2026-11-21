@@ -1,7 +1,7 @@
 ﻿const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
-const { spawnSync } = require('node:child_process')
+const { unzipToDir } = require('./zip-utils.cjs')
 const { resolveCloudEndpoint } = require('./cloud-endpoint.cjs')
 const { verifyPackagedUserBuild } = require('./verify-packaged-user-build.cjs')
 
@@ -40,14 +40,7 @@ function verifyChecksum(assetPath) {
 
 function expandArchive(archive, destination) {
   fs.mkdirSync(destination, { recursive: true })
-  const script = `$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath '${archive.replace(/'/g, "''")}' -DestinationPath '${destination.replace(/'/g, "''")}' -Force`
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
-    cwd: root,
-    stdio: 'inherit',
-    windowsHide: true
-  })
-  if (result.error) throw result.error
-  assert(result.status === 0, `Failed to extract ${archive}`)
+  unzipToDir(archive, destination)
 }
 
 assert(tag === expectedTag, `Release tag ${tag} does not match package version ${version}`)

@@ -1,7 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
-const { spawnSync } = require('node:child_process')
+const { zipDirectory, unzipToDir } = require('./zip-utils.cjs')
 const { resolveCloudEndpoint } = require('./cloud-endpoint.cjs')
 const { verifyPackagedUserBuild } = require('./verify-packaged-user-build.cjs')
 
@@ -25,16 +25,6 @@ function removeWorkspaceTemp(target, expectedName) {
   if (!fs.existsSync(target)) return
   assertSafeWorkspaceTemp(target, expectedName)
   fs.rmSync(target, { recursive: true, force: true })
-}
-
-function runPowerShell(script) {
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
-    cwd: root,
-    stdio: 'inherit',
-    windowsHide: true
-  })
-  if (result.error) throw result.error
-  if (result.status !== 0) throw new Error(`PowerShell exited with code ${result.status}`)
 }
 
 assert(fs.existsSync(source), `Packaged user app not found: ${source}. Run node scripts/build-user.cjs nsis first.`)
@@ -61,12 +51,11 @@ try {
   fs.mkdirSync(path.dirname(staging), { recursive: true })
   fs.cpSync(source, staging, { recursive: true })
 
-  const compress = `$ErrorActionPreference = 'Stop'; Compress-Archive -LiteralPath '${payloadRoot.replace(/'/g, "''")}' -DestinationPath '${zipPath.replace(/'/g, "''")}' -Force`
-  runPowerShell(compress)
+  const entryCount = zipDirectory(payloadRoot, zipPath)
+  assert(entryCount > 0, 'Update ZIP has no files')
   assert(fs.existsSync(zipPath) && fs.statSync(zipPath).size > 0, 'Update ZIP was not generated or is empty')
 
-  const expand = `$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${verifyRoot.replace(/'/g, "''")}' -Force`
-  runPowerShell(expand)
+  unzipToDir(zipPath, verifyRoot)
   verifyPackagedUserBuild(path.join(verifyRoot, 'payload', 'resources', 'app'), {
     expectedVersion: pkg.version,
     expectedEndpoint: cloudEndpoint
