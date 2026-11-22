@@ -333,7 +333,9 @@ function buildLinesFromItems(items: any[], pageNo: number, viewport: any): TextL
 }
 
 async function extractPdfLines(buffer: ArrayBuffer): Promise<{ pageCount: number; pages: TextLine[][] }> {
-  const document = await pdfjsLib.getDocument({ data: buffer, useSystemFonts: true }).promise
+  // pdf.js may detach the supplied buffer; hand it a private copy so the
+  // caller's staged/persisted bytes stay intact for later re-reads.
+  const document = await pdfjsLib.getDocument({ data: buffer.slice(0), useSystemFonts: true }).promise
   const pages: TextLine[][] = []
   try {
     for (let pageNo = 1; pageNo <= document.numPages; pageNo++) {
@@ -483,7 +485,7 @@ export async function extractTextInPdfRects(input: {
   rects: SemanticRangeRect[]
 }): Promise<string> {
   const { bytes, pageNo, rects } = input
-  const load = await pdfjsLib.getDocument({ data: bytes, useSystemFonts: true }).promise
+  const load = await pdfjsLib.getDocument({ data: bytes.slice(0), useSystemFonts: true }).promise
   try {
     if (pageNo < 1 || pageNo > load.numPages) throw new Error('PDF 页码超出范围')
     const page = await load.getPage(pageNo)

@@ -6,7 +6,6 @@ import ExamCollectionCard from '../components/exam/ExamCollectionCard.vue'
 import ExamCollectionImportDialog from '../components/exam/ExamCollectionImportDialog.vue'
 import ExamCollectionReader from '../components/exam/ExamCollectionReader.vue'
 import ExamAnnotationDialog from '../components/exam/ExamAnnotationDialog.vue'
-import LiteratureReader from '../components/LiteratureReader.vue'
 import { basicExamTypes, examMonthOptions, examPaperTypeImportOptions, examSeasonLabel } from '../lib/examMetadata'
 import { isMobileBuild } from '../mobile/isMobile'
 
@@ -83,8 +82,6 @@ const selectionMode = ref(false)
 const sortingCollections = ref(false)
 const draggedCollectionId = ref<number | null>(null)
 const dragOverCollectionId = ref<number | null>(null)
-const examReaderItem = ref<any | null>(null)
-const openingLocalFile = ref(false)
 const selectedCollectionIds = ref<number[]>([])
 const batchDeleteOpen = ref(false)
 const batchDeleting = ref(false)
@@ -268,27 +265,6 @@ async function loadCollections(): Promise<void> {
 function openReader(collection: ExamCollectionSummary): void { activeCollectionId.value = collection.id; readerOpen.value = true }
 function openImport(): void { collectionsBeforeImport.value = new Set(collections.value.map(collection => collection.id)); importOpen.value = true }
 
-// On the mobile/PWA build there is no local exam database; let the user open a
-// local PDF / DOCX straight into the shared reader, the same flow as the
-// literature page. The file bytes/text are stored in the mobile bridge's
-// IndexedDB and read back by the reader.
-async function openLocalExamFile(): Promise<void> {
-  if (openingLocalFile.value) return
-  openingLocalFile.value = true
-  try {
-    const result = await window.cet4Api.chooseLiteratureFile()
-    if (result.canceled) return
-    if (result.success && result.item) {
-      examReaderItem.value = result.item
-    } else {
-      setNotice(result.message || '本地文件导入失败', 'error')
-    }
-  } catch (error) {
-    setNotice((error as Error).message || '本地文件导入失败', 'error')
-  } finally {
-    openingLocalFile.value = false
-  }
-}
 async function handleCollectionsImported(): Promise<void> {
   await loadCollections()
   if (!gradeKey.value) return
@@ -424,7 +400,7 @@ onMounted(loadCollections)
             <option v-for="(label, key) in gradeLabels" :key="key" :value="key">{{ label }}</option>
           </select>
         </label>
-        <button type="button" class="primary" @click="openImport">批量导入真题 / 听力</button><button v-if="mobile" type="button" :disabled="openingLocalFile" @click="openLocalExamFile">{{ openingLocalFile ? '正在解析…' : '打开本地文件' }}</button><button v-if="!selectionMode" type="button" class="sort-button" :class="{ active: sortingCollections }" :disabled="sectionCollections.length < 2" @click="toggleCollectionSorting">{{ sortingCollections ? '完成排序' : '自主排序' }}</button><button v-if="!selectionMode && !sortingCollections" type="button" class="batch-delete-button" @click="toggleSelectionMode">批量删除</button><button v-if="selectionMode" type="button" @click="toggleSelectionMode">取消批量删除</button><button v-if="selectionMode" type="button" class="batch-delete-button active" :disabled="!selectedCollections.length" @click="batchDeleteOpen = true">删除已选（{{ selectedCollections.length }}）</button><button type="button" :disabled="sortingCollections" @click="loadCollections">刷新合集</button>
+        <button type="button" class="primary" @click="openImport">批量导入真题 / 听力</button><button v-if="!selectionMode" type="button" class="sort-button" :class="{ active: sortingCollections }" :disabled="sectionCollections.length < 2" @click="toggleCollectionSorting">{{ sortingCollections ? '完成排序' : '自主排序' }}</button><button v-if="!selectionMode && !sortingCollections" type="button" class="batch-delete-button" @click="toggleSelectionMode">批量删除</button><button v-if="selectionMode" type="button" @click="toggleSelectionMode">取消批量删除</button><button v-if="selectionMode" type="button" class="batch-delete-button active" :disabled="!selectedCollections.length" @click="batchDeleteOpen = true">删除已选（{{ selectedCollections.length }}）</button><button type="button" :disabled="sortingCollections" @click="loadCollections">刷新合集</button>
       </div>
     </header>
 
@@ -450,14 +426,13 @@ onMounted(loadCollections)
     </section>
 
     <div v-if="loading" class="hub-state">正在加载真题合集…</div>
-    <div v-else-if="!filteredCollections.length" class="hub-state empty"><div>📦</div><strong>{{ mobile ? '还没有导入真题合集' : '还没有匹配的真题合集' }}</strong><span>{{ mobile ? '点击上方“批量导入真题 / 听力”多选 PDF 与音频，自动识别题干、解析并绑定 A/B 听力；也可以点“打开本地文件”直接阅读单份 PDF / Word。' : '导入 PDF 和听力音频后，软件会自动建立合集、解析与 A/B 听力资源。' }}</span><button v-if="mobile" type="button" @click="openImport">批量导入真题 / 听力</button><button v-if="mobile" type="button" :disabled="openingLocalFile" @click="openLocalExamFile">打开本地文件</button><button v-else type="button" @click="openImport">导入第一份真题资源</button></div>
+    <div v-else-if="!filteredCollections.length" class="hub-state empty"><div>📦</div><strong>{{ mobile ? '还没有导入真题合集' : '还没有匹配的真题合集' }}</strong><span>{{ mobile ? '点击“批量导入真题 / 听力”多选 PDF 与音频，自动识别题干、解析并绑定 A/B 听力。' : '导入 PDF 和听力音频后，软件会自动建立合集、解析与 A/B 听力资源。' }}</span><button v-if="mobile" type="button" @click="openImport">批量导入真题 / 听力</button><button v-else type="button" @click="openImport">导入第一份真题资源</button></div>
     <section v-else class="collection-list">
       <ExamCollectionCard v-for="collection in filteredCollections" :key="collection.id" :collection="collection" :selection-mode="selectionMode" :selected="selectedCollectionIds.includes(collection.id)" @open="openReader" @audio="importAudio" @annotate="openAnnotation" @edit="startEdit" @delete="askDelete" @toggle-select="toggleCollectionSelection" />
     </section>
 
     <ExamCollectionImportDialog :open="importOpen" :max-pdf-files="maxBatchPdfFiles" @close="importOpen = false" @imported="handleCollectionsImported" />
     <ExamCollectionReader v-if="readerOpen && activeCollectionId" :collection-id="activeCollectionId" :type="middleSchool ? 'middleSchool' : String(route.query.type || '')" @close="readerOpen = false" @annotate="openAnnotation" />
-    <LiteratureReader v-if="examReaderItem" :item="examReaderItem" @close="examReaderItem = null" />
     <ExamAnnotationDialog :open="Boolean(annotationCollection)" :collection="annotationCollection" @close="annotationCollection = null" @updated="handleAnnotationUpdated" />
 
     <div v-if="bindingTarget" class="modal-backdrop">

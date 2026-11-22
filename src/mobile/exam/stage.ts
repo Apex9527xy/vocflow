@@ -58,7 +58,10 @@ export async function readStagedFileBytes(id: string): Promise<ArrayBuffer | nul
     record.bytes = await record.file.arrayBuffer()
     delete record.file
   }
-  return record.bytes
+  if (record.bytes.byteLength === 0) return record.bytes
+  // Return an independent copy: pdf.js detaches the ArrayBuffer it consumes,
+  // and the save step re-reads the same staged record afterwards.
+  return record.bytes.slice(0)
 }
 
 export function stagedFileName(id: string): string {

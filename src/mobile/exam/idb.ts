@@ -90,7 +90,10 @@ export async function getExamFile(resourceId: string): Promise<{ bytes: ArrayBuf
       request.onerror = () => rejectGet(request.error || new Error('读取真题文件失败'))
     })
     if (!record) return null
-    return { bytes: record.bytes as ArrayBuffer, fileName: String(record.fileName || ''), mime: String(record.mime || '') }
+    // Return a copy so consumers (pdf.js) detaching their buffer cannot
+    // detach the ArrayBuffer kept inside the IndexedDB record.
+    const bytes = (record.bytes as ArrayBuffer).slice(0)
+    return { bytes, fileName: String(record.fileName || ''), mime: String(record.mime || '') }
   } finally {
     db.close()
   }

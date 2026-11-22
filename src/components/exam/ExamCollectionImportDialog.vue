@@ -2,9 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { toIpcPayload } from '../../lib/ipc-payload'
 import { examMonthOptions, examPaperTypeImportOptions, examSeasonLabel } from '../../lib/examMetadata'
+import { isMobileBuild } from '../../mobile/isMobile'
 
 const props = withDefaults(defineProps<{ open: boolean; maxPdfFiles?: number }>(), { maxPdfFiles: 10 })
 const emit = defineEmits<{ (event: 'close'): void; (event: 'imported'): void }>()
+const mobile = isMobileBuild()
 
 interface AudioImportRow {
   filePath: string
@@ -327,7 +329,7 @@ watch(() => props.open, open => {
 
         <div class="scan-bar">
           <button type="button" :disabled="scanning || importing" @click="openPicker">选择 PDF / 听力文件</button>
-          <button type="button" class="folder-picker" :disabled="scanning || importing" @click="openFolderPicker">选择资源文件夹</button>
+          <button v-if="!mobile" type="button" class="folder-picker" :disabled="scanning || importing" @click="openFolderPicker">选择资源文件夹</button>
           <div class="scan-copy"><strong>{{ scanMessage || '请选择需要识别的真题或听力资源' }}</strong><span v-if="errorMessage" class="error">{{ errorMessage }}</span><span v-else-if="summary" class="success">{{ summary }}</span></div>
           <b>{{ scanProgress }}%</b>
         </div>
