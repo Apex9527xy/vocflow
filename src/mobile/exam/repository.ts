@@ -13,6 +13,17 @@ type ExamSeason = ExamSeasonKey
 type SegmentContentType = CollectionContentType
 type SegmentStatus = CollectionSegmentStatus
 
+/**
+ * Browser resource ids look like `exam-file-<ts>-<idx>-<rand>-<fileName>` because
+ * the PWA has no real paths. Strip that opaque prefix so the UI shows the name
+ * the user actually picked.
+ */
+export function displayFileName(resourceId: string): string {
+  const base = String(resourceId || '').split(/[/\\]/).pop() || ''
+  const match = base.match(/^exam-file-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-(.+)$/)
+  return match ? match[1] : base
+}
+
 export interface InsertSegmentInput {
   collectionId: number
   paperId: number | null
@@ -78,14 +89,14 @@ export class ExamCollectionRepository {
       sourceMap.set(segment.source_file_path, {
         path: segment.source_file_path,
         hash: segment.source_file_hash,
-        fileName: segment.source_file_path.split(/[/\\]/).pop() || segment.source_file_path
+        fileName: displayFileName(segment.source_file_path) || segment.source_file_path
       })
     }
     for (const analysis of analyses) {
       sourceMap.set(analysis.source_file_path, {
         path: analysis.source_file_path,
         hash: analysis.source_file_hash,
-        fileName: analysis.file_name || analysis.source_file_path.split(/[/\\]/).pop() || analysis.source_file_path
+        fileName: analysis.file_name || displayFileName(analysis.source_file_path) || analysis.source_file_path
       })
     }
     return { ...collection, papers, audio, analyses, segments, pendingCount, segmentCount: segments.length, sourceFiles: [...sourceMap.values()] }

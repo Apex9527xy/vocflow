@@ -39,6 +39,29 @@ const activeSegments = computed(() => collection.value?.segments.filter(segment 
 const examSegments = computed(() => activeSegments.value.filter(segment => segment.content_type === 'paper'))
 const analysisSegments = computed(() => activeSegments.value.filter(segment => segment.content_type === 'analysis' && (!segment.audio_slot || segment.audio_slot === activeAudioSlot.value)))
 const pendingSegments = computed(() => collection.value?.segments.filter(segment => segment.status === 'pending_review') || [])
+
+// Source PDFs to page through continuously in the paper column: prefer the ones
+// the current paper's segments came from, then any paper source, then collection PDFs.
+const paperSourceFiles = computed<Array<{ path: string; fileName: string }>>(() => {
+  const detail = collection.value
+  if (!detail) return []
+  const known = detail.sourceFiles || []
+  const collect = (segments: ExamContentSegmentRecord[]): string[] => [...new Set(segments
+    .filter(segment => segment.content_type === 'paper' && segment.source_file_path)
+    .map(segment => segment.source_file_path))]
+  let paths = collect(examSegments.value)
+  if (!paths.length) paths = collect(detail.segments)
+  if (!paths.length) {
+    paths = known
+      .filter(file => /\.pdf$/i.test(file.path) || /\.pdf$/i.test(file.fileName || ''))
+      .map(file => file.path)
+  }
+  return paths.map(path => ({
+    path,
+    fileName: known.find(file => file.path === path)?.fileName || String(path).split(/[/\\]/).pop() || path
+  }))
+})
+
 const audioForSlot = computed(() => collection.value?.audio.find(item => item.audio_slot === activeAudioSlot.value) || null)
 const audioTime = computed(() => `${formatTime(currentTime.value)} / ${duration.value ? formatTime(duration.value) : '--:--'}`)
 const audioProgress = computed(() => duration.value ? Math.min(100, currentTime.value / duration.value * 100) : 0)
@@ -236,8 +259,8 @@ watch(activeAudioSlot, () => { if (collection.value) void prepareAudio() })
           <header><strong>真题题干</strong><span>{{ paperTitle }}</span></header>
           <div v-if="loading" class="column-state">正在加载合集…</div>
           <div v-else-if="!activePaper" class="column-state"><strong>该套卷子尚未导入</strong><span>合集允许缺失卷子，可继续使用其他卷或稍后补充。</span></div>
-          <div v-else-if="!examSegments.length" class="column-state"><strong>暂无已确认的真题片段</strong><span>可在“待核对片段”中核对内容区域，或重新批量导入带语义片段的 PDF。</span></div>
-          <ExamSegmentPdfPane v-else :collection-id="props.collectionId" :paper-id="activePaper.id" :segments="examSegments" role="paper" label="真题原文" :zoom="readerZoom" :active-ink-tool="activeInkTool" :ink-color="inkColor" :ink-line-width="inkLineWidth" :eraser-size="inkEraserSize" />
+          <div v-else-if="!examSegments.length && !paperSourceFiles.length" class="column-state"><strong>暂无已确认的真题片段</strong><span>可在“待核对片段”中核对内容区域，或重新批量导入带语义片段的 PDF。</span></div>
+          <ExamSegmentPdfPane v-else :collection-id="props.collectionId" :paper-id="activePaper.id" :segments="examSegments" role="paper" label="真题原文" :zoom="readerZoom" :active-ink-tool="activeInkTool" :ink-color="inkColor" :ink-line-width="inkLineWidth" :eraser-size="inkEraserSize" :render-all-pages="true" :source-files="paperSourceFiles" />
         </section>
 
         <section v-if="showAnalysis" class="reading-column analysis-column">

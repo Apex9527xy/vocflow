@@ -15,6 +15,10 @@ const props = defineProps<{
   inkColor: string
   inkLineWidth: number
   eraserSize: number
+  /** When true, render every page of the source PDF instead of only pages referenced by segments. */
+  renderAllPages?: boolean
+  /** Source PDFs of the collection, used by renderAllPages to know what to open. */
+  sourceFiles?: Array<{ path: string; fileName: string }>
 }>()
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./assets/pdf.worker.min.mjs', window.location.href).href
@@ -25,6 +29,13 @@ interface PageReference {
   fileName: string
   pageNo: number
   order: number
+}
+
+/** The PWA stores files under ids like `exam-file-...-<real name>`; show the real name. */
+function displayName(pathOrId: string): string {
+  const base = String(pathOrId || '').split(/[/\\]/).pop() || ''
+  const match = base.match(/^exam-file-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+-(.+)$/)
+  return match ? match[1] : base
 }
 
 interface SegmentPageView {
@@ -60,7 +71,44 @@ let lastLayoutWidth = 0
 const documentCache = new Map<string, any>()
 const pageViews: SegmentPageView[] = []
 
+const pageCountBySource = ref<Record<string, number>>({})
+
+const displaySources = computed<Array<{ path: string; fileName: string }>>(() => {
+  if (!props.renderAllPages) return []
+  const fromProps = (props.sourceFiles || [])
+    .filter(item => item && item.path)
+    .map(item => ({ path: item.path, fileName: item.fileName || displayName(item.path) }))
+  if (fromProps.length) return fromProps
+  // Segments often carry the source path even when the collection list does not.
+  const seen = new Set<string>()
+  const fromSegments: Array<{ path: string; fileName: string }> = []
+  for (const segment of props.segments) {
+    const path = segment.source_file_path
+    if (!path || seen.has(path)) continue
+    seen.add(path)
+    fromSegments.push({ path, fileName: displayName(path) })
+  }
+  return fromSegments
+})
+
 const pageReferences = computed<PageReference[]>(() => {
+  if (props.renderAllPages) {
+    const output: PageReference[] = []
+    let order = 0
+    for (const source of displaySources.value) {
+      const total = pageCountBySource.value[source.path] || 0
+      for (let pageNo = 1; pageNo <= total; pageNo++) {
+        output.push({
+          key: `${source.path}#${pageNo}`,
+          sourceFilePath: source.path,
+          fileName: source.fileName,
+          pageNo,
+          order: order++
+        })
+      }
+    }
+    return output
+  }
   const unique = new Map<string, PageReference>()
   for (const segment of props.segments) {
     if (!['auto_confirmed', 'confirmed'].includes(segment.status)) continue
@@ -71,7 +119,7 @@ const pageReferences = computed<PageReference[]>(() => {
       unique.set(key, {
         key,
         sourceFilePath,
-        fileName: sourceFilePath.split(/[/\\]/).pop() || sourceFilePath,
+        fileName: displayName(sourceFilePath),
         pageNo,
         order: segment.segment_order
       })
@@ -195,9 +243,23 @@ function createPageView(reference: PageReference, viewport: any, pageIndex: numb
   return view
 }
 
+async function ensurePageCounts(): Promise<void> {
+  if (!props.renderAllPages) return
+  const next: Record<string, number> = { ...pageCountBySource.value }
+  let changed = false
+  for (const source of displaySources.value) {
+    if (next[source.path]) continue
+    const pdfDocument = await getPdfDocument(source.path)
+    next[source.path] = Math.max(1, Number(pdfDocument.numPages) || 1)
+    changed = true
+  }
+  if (changed) pageCountBySource.value = next
+}
+
 async function buildPages(): Promise<void> {
   const host = pagesHost.value
   if (!host) return
+  await ensurePageCounts()
   const token = ++layoutToken
   const anchor = captureScrollAnchor()
   pageObserver?.disconnect()
@@ -564,13 +626,19 @@ async function resetDocuments(): Promise<void> {
   if (pagesHost.value) pagesHost.value.innerHTML = ''
 }
 
-watch(() => [props.segments.map(segment => segment.id).join(','), scopeKey.value], async () => {
+watch(() => [
+  props.segments.map(segment => segment.id).join(','),
+  scopeKey.value,
+  props.renderAllPages ? '1' : '0',
+  (props.sourceFiles || []).map(item => item.path).join(',')
+], async () => {
   await loadInkRecords()
   loading.value = true
   textInteractionReady.value = false
   firstPageReady.value = false
   error.value = ''
   await resetDocuments()
+  pageCountBySource.value = {}
   await nextTick()
   await buildPages()
 })

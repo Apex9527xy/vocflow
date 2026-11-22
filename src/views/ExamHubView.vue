@@ -143,19 +143,27 @@ function categoryStats(type: string): { count: number; complete: number } {
   return { count: rows.length, complete: rows.filter(collection => collection.status === 'ready').length }
 }
 
-const summary = computed(() => ({
-  collections: sectionCollections.value.length,
-  papers: sectionCollections.value.reduce((sum, collection) => sum + collection.papers.length, 0),
-  pending: sectionCollections.value.reduce((sum, collection) => sum + collection.pendingCount, 0),
-  complete: sectionCollections.value.filter(collection => collection.status === 'ready').length
-}))
+const summary = computed(() => {
+  // “待分类” and “全部合集” are library-wide views, so the numbers must follow
+  // the visible list instead of the section-restricted one.
+  const base = (selectedType.value === 'unknown' || selectedType.value === 'all') ? filteredCollections.value : sectionCollections.value
+  return {
+    collections: base.length,
+    papers: base.reduce((sum, collection) => sum + collection.papers.length, 0),
+    pending: base.reduce((sum, collection) => sum + collection.pendingCount, 0),
+    complete: base.filter(collection => collection.status === 'ready').length
+  }
+})
 
 const bindableCollections = computed(() => collections.value.filter(collection => collection.papers.length > 0 && collection.segmentCount > 0))
 const bindingCollection = computed(() => collections.value.find(collection => collection.id === bindingCollectionId.value) || null)
 
 const filteredCollections = computed(() => {
   const value = query.value.trim().toLowerCase()
-  return sectionCollections.value.filter(collection => {
+  // “待分类” is library-wide: unidentified imports must stay reachable from any
+  // section (papers are often imported before their exam type is recognised).
+  const base = selectedType.value === 'unknown' ? collections.value : sectionCollections.value
+  return base.filter(collection => {
     if (selectedType.value === 'unknown') {
       if (collection.exam_type !== 'unknown') return false
     } else if (selectedType.value !== 'all') {
@@ -267,6 +275,14 @@ function openImport(): void { collectionsBeforeImport.value = new Set(collection
 
 async function handleCollectionsImported(): Promise<void> {
   await loadCollections()
+  const added = collections.value.filter(collection => !collectionsBeforeImport.value.has(collection.id))
+  const hidden = added.filter(collection => !sectionCollections.value.some(item => item.id === collection.id))
+  if (hidden.length) {
+    // Newly imported papers that the current section cannot show (unrecognised
+    // exam type) would otherwise look like a failed import — surface them.
+    selectedType.value = 'unknown'
+    setNotice(`已导入 ${hidden.length} 个合集，但考试类型未识别，已切换到“待分类”显示`, 'success')
+  }
   if (!gradeKey.value) return
   const map = readGradeMap()
   for (const collection of collections.value) if (!collectionsBeforeImport.value.has(collection.id)) map[collection.id] = gradeKey.value

@@ -9,7 +9,10 @@
  */
 
 const DB_NAME = 'vocflow-mobile-exam'
-const DB_VERSION = 1
+// v2: rebuild the files store if an older createObjectStore() left it without an
+// in-line keyPath ('id'); that made put() fail with "out-of-line keys and has no
+// key generator and the key parameter was not provided".
+const DB_VERSION = 2
 const SNAPSHOT_STORE = 'db-snapshot'
 const FILE_STORE = 'files'
 
@@ -24,8 +27,19 @@ function openDb(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onupgradeneeded = () => {
       const db = request.result
+      const transaction = request.transaction
       if (!db.objectStoreNames.contains(SNAPSHOT_STORE)) db.createObjectStore(SNAPSHOT_STORE)
-      if (!db.objectStoreNames.contains(FILE_STORE)) db.createObjectStore(FILE_STORE, { keyPath: 'id' })
+      if (!db.objectStoreNames.contains(FILE_STORE)) {
+        db.createObjectStore(FILE_STORE, { keyPath: 'id' })
+      } else {
+        // Existing store may predate the in-line keyPath; rebuild only when the
+        // shape is wrong so current data keeps its upgrade path intact.
+        const existing = transaction?.objectStore(FILE_STORE)
+        if (existing && existing.keyPath !== 'id') {
+          db.deleteObjectStore(FILE_STORE)
+          db.createObjectStore(FILE_STORE, { keyPath: 'id' })
+        }
+      }
     }
     request.onsuccess = () => resolveOpen(request.result)
     request.onerror = () => rejectOpen(request.error || new Error('本地真题库打开失败'))
@@ -61,7 +75,12 @@ export async function saveDbSnapshot(bytes: ArrayBuffer): Promise<void> {
   const db = await openDb()
   try {
     const tx = db.transaction(SNAPSHOT_STORE, 'readwrite')
-    tx.objectStore(SNAPSHOT_STORE).put({ key: SNAPSHOT_KEY, bytes, savedAt: Date.now() })
+    const store = tx.objectStore(SNAPSHOT_STORE)
+    const record = { key: SNAPSHOT_KEY, bytes, savedAt: Date.now() }
+    // The snapshot store is created without a keyPath, so the key must be passed
+    // explicitly; omitting it throws DataError and silently loses every commit.
+    if (store.keyPath == null) store.put(record, SNAPSHOT_KEY)
+    else store.put(record)
     await txDone(tx)
   } finally {
     db.close()
@@ -73,7 +92,11 @@ export async function putExamFile(resourceId: string, bytes: ArrayBuffer, fileNa
   const db = await openDb()
   try {
     const tx = db.transaction(FILE_STORE, 'readwrite')
-    tx.objectStore(FILE_STORE).put({ id: resourceId, bytes, fileName, mime, savedAt: Date.now() })
+    const store = tx.objectStore(FILE_STORE)
+    const record = { id: resourceId, bytes, fileName, mime, savedAt: Date.now() }
+    // Out-of-line stores need the key passed explicitly; in-line ones reject it.
+    if (store.keyPath == null) store.put(record, resourceId)
+    else store.put(record)
     await txDone(tx)
   } finally {
     db.close()
