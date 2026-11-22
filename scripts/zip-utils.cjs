@@ -105,8 +105,7 @@ function zipDirectory(srcDir, zipFile) {
   return entries.length
 }
 
-function unzipToDir(zipFile, destDir) {
-  const buf = fs.readFileSync(zipFile)
+function unzipBufferToDir(buf, destDir) {
   let p = 0
   let extracted = 0
   const rootPrefix = path.resolve(destDir) + path.sep
@@ -131,4 +130,8 @@ function unzipToDir(zipFile, destDir) {
   return extracted
 }
 
-module.exports = { zipDirectory, unzipToDir }
+function unzipToDir(zipFile, destDir) {
+  return unzipBufferToDir(fs.readFileSync(zipFile), destDir)
+}
+
+module.exports = { zipDirectory, unzipToDir, unzipBufferToDir }

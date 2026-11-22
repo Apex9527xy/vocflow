@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { basename, extname } from 'node:path'
+import { inflateRawSync } from 'node:zlib'
 
 const require = createRequire(import.meta.url)
 const workerPath = require.resolve('pdfjs-dist/build/pdf.worker.mjs')
@@ -221,4 +222,53 @@ export function extractLocalText(filePath: string): string {
   const raw = readFileSync(filePath, 'utf8')
   if (extension === '.html' || extension === '.htm') return extractHtmlText(raw)
   return cleanText(raw)
+}
+
+// Minimal DOCX (.docx is a ZIP of OOXML) reader that unpacks word/document.xml
+// and reconstructs paragraphs. We deliberately avoid a third-party Word parser:
+// the reader only needs plain paragraph text for the article view, and this
+// keeps the desktop bundle dependency-free.
+interface DocxZipEntry { name: string; method: number; data: Buffer }
+
+function readZipEntries(buffer: Buffer): DocxZipEntry[] {
+  const entries: DocxZipEntry[] = []
+  let p = 0
+  while (p + 4 <= buffer.length && buffer.readUInt32LE(p) === 0x04034b50) {
+    const method = buffer.readUInt16LE(p + 8)
+    const compSize = buffer.readUInt32LE(p + 18)
+    const nameLen = buffer.readUInt16LE(p + 26)
+    const extraLen = buffer.readUInt16LE(p + 28)
+    const name = buffer.toString('utf8', p + 30, p + 30 + nameLen)
+    const dataStart = p + 30 + nameLen + extraLen
+    const payload = buffer.subarray(dataStart, dataStart + compSize)
+    entries.push({
+      name,
+      method,
+      data: method === 0 ? Buffer.from(payload) : inflateRawSync(payload)
+    })
+    p = dataStart + compSize
+  }
+  return entries
+}
+
+export function extractDocxText(filePath: string): string {
+  const buffer = readFileSync(filePath)
+  const entries = readZipEntries(buffer)
+  const documentEntry = entries.find(entry => /^word\/document\.xml$/i.test(entry.name))
+  if (!documentEntry) throw new Error('DOCX 中缺少正文文件，可能不是有效的 Word 文档')
+  const xml = documentEntry.data.toString('utf8')
+  const paragraphs: string[] = []
+  for (const paragraphMatch of xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/gi)) {
+    const paragraphXml = paragraphMatch[0]
+    const texts: string[] = []
+    for (const runMatch of paragraphXml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/gi)) {
+      texts.push(decodeHtml(runMatch[1]))
+    }
+    // w:tab and w:br map to a space/newline hint; keep the paragraph text readable.
+    const line = texts.join('').replace(/\s+/g, ' ').trim()
+    if (line) paragraphs.push(line)
+  }
+  const contentText = cleanText(paragraphs.join('\n\n'))
+  if (!contentText) throw new Error('DOCX 中没有可读取的文字内容')
+  return contentText
 }

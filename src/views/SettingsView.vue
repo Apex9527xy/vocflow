@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import releaseNotesData from '../data/release-notes.json'
 import ActivityStatsCard from '../components/settings/ActivityStatsCard.vue'
+import { useUpdateState } from '../composables/useUpdateState'
 
 const newWordsTarget = ref(20)
 const reviewWordsTarget = ref(30)
@@ -14,8 +15,7 @@ const wordBooks = ref<any[]>([])
 const appVersion = ref('1.0.0')
 const updateInfo = ref<any>(null)
 const checkingUpdate = ref(false)
-const installingUpdate = ref(false)
-const updateMessage = ref('')
+const { installingUpdate, updateMessage, setInstalling } = useUpdateState()
 
 // 学习提醒
 const reminders = ref<any[]>([])
@@ -38,6 +38,9 @@ const visibleWordBooks = computed(() => wordBooks.value.filter(book => book.slug
 let updatePollId: number | undefined
 
 async function refreshUpdate(force = false) {
+  // While an install is in progress, do not re-query the manifest or overwrite
+  // the "正在下载并安装更新…" status. The updater restarts the app on finish.
+  if (installingUpdate.value) return
   checkingUpdate.value = true
   updateMessage.value = ''
   try {
@@ -67,17 +70,14 @@ async function handleUpdateButton() {
     await refreshUpdate(true)
     return
   }
-  installingUpdate.value = true
-  updateMessage.value = '正在下载并安装更新…'
+  setInstalling(true, '正在下载并安装更新…')
   try {
     const result = await window.cet4Api.installUpdate()
     if (!result.success) {
-      updateMessage.value = result.message || '更新失败'
-      installingUpdate.value = false
+      setInstalling(false, result.message || '更新失败')
     }
   } catch {
-    updateMessage.value = '更新失败，请稍后重试'
-    installingUpdate.value = false
+    setInstalling(false, '更新失败，请稍后重试')
   }
 }
 

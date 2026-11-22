@@ -4,7 +4,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import type { DbWrapper } from '../database/wrapper'
 import { LiteratureRepository } from '../database/repositories/literature.repository'
-import { extractLocalText, extractPdfInfo, extractWebLiteratureMetadata } from '../lib/literature-file'
+import { extractDocxText, extractLocalText, extractPdfInfo, extractWebLiteratureMetadata } from '../lib/literature-file'
 import { saveDatabase } from '../database/connection'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { randomBytes } from 'node:crypto'
@@ -522,8 +522,8 @@ async function importLocalLiterature(
   storagePath: string
 ): Promise<any> {
   const extension = extname(sourcePath).toLowerCase()
-  if (!['.pdf', '.html', '.htm', '.txt', '.md'].includes(extension)) {
-    throw new Error('目前支持 PDF、HTML、TXT 和 Markdown 文件')
+  if (!['.pdf', '.html', '.htm', '.txt', '.md', '.docx'].includes(extension)) {
+    throw new Error('目前支持 PDF、DOCX、HTML、TXT 和 Markdown 文件')
   }
   if (statSync(sourcePath).size > 220 * 1024 * 1024) throw new Error('文件超过 220MB')
   const copied = copyToStorage(sourcePath, storagePath)
@@ -541,7 +541,7 @@ async function importLocalLiterature(
       metadata: { importedFrom: sourcePath, pageCount: info.pageCount }
     })
   }
-  const contentText = extractLocalText(copied)
+  const contentText = extension === '.docx' ? extractDocxText(copied) : extractLocalText(copied)
   const fallbackTitle = basename(copied, extension)
   return repo.create({
     title: fallbackTitle,
@@ -661,7 +661,7 @@ function listPdfFilesRecursive(root: string): string[] {
     for (const entry of entries) {
       const fullPath = join(directory, String(entry.name))
       if (entry.isDirectory()) visit(fullPath)
-      else if (entry.isFile() && /\.pdf$/i.test(String(entry.name))) output.push(fullPath)
+      else if (entry.isFile() && /\.(pdf|docx)$/i.test(String(entry.name))) output.push(fullPath)
     }
   }
   visit(root)
@@ -681,7 +681,7 @@ export function registerLiteratureHandlers(ipcMain: IpcMain, db: DbWrapper): voi
   const startAutoImportWatch = (folderPath: string): { success: boolean; message: string; count?: number } => {
     stopAutoImportWatch()
     const root = resolve(folderPath)
-    if (!existsSync(root) || !statSync(root).isDirectory()) return { success: false, message: 'PDF 自动导入路径不存在' }
+    if (!existsSync(root) || !statSync(root).isDirectory()) return { success: false, message: '文档自动导入路径不存在' }
     autoImportRoot = root
     const initialFiles = listPdfFilesRecursive(root)
     const baseline = new Map<string, number>()
@@ -721,13 +721,13 @@ export function registerLiteratureHandlers(ipcMain: IpcMain, db: DbWrapper): voi
       }
       for (const file of [...pending.keys()]) if (!currentFiles.includes(file)) pending.delete(file)
     }, 1400)
-    return { success: true, message: `正在监听新 PDF，目录中已有 ${initialFiles.length} 个 PDF`, count: initialFiles.length }
+    return { success: true, message: `正在监听新文档，目录中已有 ${initialFiles.length} 个文件`, count: initialFiles.length }
   }
   ipcMain.handle('literature:setAutoImportWatch', (_event, payload: { enabled: boolean; path: string }) => {
     try {
       if (!payload?.enabled) {
         stopAutoImportWatch()
-        return { success: true, message: 'PDF 自动导入已关闭' }
+        return { success: true, message: '文档自动导入已关闭' }
       }
       return startAutoImportWatch(String(payload.path || ''))
     } catch (error) {
@@ -813,7 +813,7 @@ export function registerLiteratureHandlers(ipcMain: IpcMain, db: DbWrapper): voi
       title: '打开要加入文献库的本地文献',
       properties: ['openFile'],
       filters: [
-        { name: '文献文件', extensions: ['pdf', 'html', 'htm', 'txt', 'md'] },
+        { name: '文献文件', extensions: ['pdf', 'docx', 'html', 'htm', 'txt', 'md'] },
         { name: '所有文件', extensions: ['*'] }
       ]
     }

@@ -5,10 +5,14 @@ import router from './router'
 import './styles/variables.css'
 import './styles/global.css'
 import { installMobileBridge } from './mobile/mobileApi'
+import { initExamDb } from './mobile/exam/db'
 
 if (__VOCFLOW_MOBILE__) {
   installMobileBridge()
   document.documentElement.classList.add('vocflow-mobile')
+  // Warm up the in-browser exam SQLite snapshot early; failures are non-fatal
+  // and surface lazily when the exam module is first opened.
+  initExamDb().catch(() => {})
 }
 
 const app = createApp(App)

@@ -1,5 +1,7 @@
 ﻿import packageJson from '../../package.json'
 import cet4Core from '../../resources/wordbooks/cet4-core.json'
+import { stageExamFiles } from './exam/stage'
+import * as examImport from './exam/importService'
 
 type RawWord = {
   word: string
@@ -56,8 +58,153 @@ const STORAGE = {
   lookupHistory: 'vocflow.mobile.lookups.v1',
   reminders: 'vocflow.mobile.reminders.v1',
   planDone: 'vocflow.mobile.plan-done.v1',
-  sessions: 'vocflow.mobile.sessions.v1'
+  sessions: 'vocflow.mobile.sessions.v1',
+  literature: 'vocflow.mobile.literature.v1'
 } as const
+
+// Local PDFs / DOCX imported on the mobile/PWA build are kept in IndexedDB: the
+// file bytes are too large for localStorage, and the browser has no direct access
+// to the desktop file system. PDFs open in the in-app pdf.js view; DOCX text is
+// extracted in-browser and rendered by the article view. We only swap the source
+// of the bytes from the Electron main process to an in-browser file picker.
+const LITERATURE_DB_NAME = 'vocflow-mobile-literature'
+const LITERATURE_STORE = 'files'
+
+type MobileLiteratureMeta = {
+  id: number
+  title: string
+  authors: string
+  year: string
+  source: string
+  abstract: string
+  content_text: string
+  file_path: string
+  file_type: string
+  created_at: string
+  size: number
+}
+
+function openLiteratureDb(): Promise<IDBDatabase> {
+  return new Promise((resolveDb, rejectDb) => {
+    if (typeof indexedDB === 'undefined') {
+      rejectDb(new Error('当前浏览器不支持本地存储'))
+      return
+    }
+    const request = indexedDB.open(LITERATURE_DB_NAME, 1)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(LITERATURE_STORE)) {
+        db.createObjectStore(LITERATURE_STORE, { keyPath: 'id' })
+      }
+    }
+    request.onsuccess = () => resolveDb(request.result)
+    request.onerror = () => rejectDb(request.error || new Error('本地文献库打开失败'))
+  })
+}
+
+async function literatureMetaList(): Promise<MobileLiteratureMeta[]> {
+  return readStorage<MobileLiteratureMeta[]>(STORAGE.literature, [])
+}
+
+async function saveLiteratureMetaList(rows: MobileLiteratureMeta[]): Promise<void> {
+  writeStorage(STORAGE.literature, rows)
+}
+
+async function putLiteratureBytes(id: number, bytes: ArrayBuffer): Promise<void> {
+  const db = await openLiteratureDb()
+  await new Promise<void>((resolvePut, rejectPut) => {
+    const tx = db.transaction(LITERATURE_STORE, 'readwrite')
+    tx.objectStore(LITERATURE_STORE).put({ id, bytes })
+    tx.oncomplete = () => { db.close(); resolvePut() }
+    tx.onerror = () => { db.close(); rejectPut(tx.error || new Error('保存文献失败')) }
+  })
+}
+
+async function getLiteratureBytes(id: number): Promise<ArrayBuffer | null> {
+  const db = await openLiteratureDb()
+  return new Promise((resolveGet, rejectGet) => {
+    const tx = db.transaction(LITERATURE_STORE, 'readonly')
+    const request = tx.objectStore(LITERATURE_STORE).get(id)
+    request.onsuccess = () => {
+      db.close()
+      resolveGet(request.result ? (request.result.bytes as ArrayBuffer) : null)
+    }
+    request.onerror = () => { db.close(); rejectGet(request.error || new Error('读取文献失败')) }
+  })
+}
+
+async function deleteLiteratureBytes(id: number): Promise<void> {
+  const db = await openLiteratureDb()
+  await new Promise<void>((resolveDel, rejectDel) => {
+    const tx = db.transaction(LITERATURE_STORE, 'readwrite')
+    tx.objectStore(LITERATURE_STORE).delete(id)
+    tx.oncomplete = () => { db.close(); resolveDel() }
+    tx.onerror = () => { db.close(); rejectDel(tx.error || new Error('删除文献失败')) }
+  })
+}
+
+function decodeXmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+}
+
+async function inflateRawAsync(compressed: Uint8Array): Promise<Uint8Array> {
+  if (typeof DecompressionStream === 'undefined') {
+    throw new Error('当前浏览器不支持解压 Word 文档，请使用桌面版导入该文件')
+  }
+  const sliced = compressed.slice()
+  const stream = new Blob([sliced.buffer.slice(sliced.byteOffset, sliced.byteOffset + sliced.byteLength)]).stream()
+    .pipeThrough(new DecompressionStream('deflate-raw'))
+  const buffer = await new Response(stream).arrayBuffer()
+  return new Uint8Array(buffer)
+}
+
+interface MobileDocxEntry { name: string; data: Uint8Array }
+
+async function readDocxEntries(buffer: Uint8Array): Promise<MobileDocxEntry[]> {
+  const entries: MobileDocxEntry[] = []
+  let p = 0
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+  while (p + 4 <= buffer.length && view.getUint32(p, true) === 0x04034b50) {
+    const method = view.getUint16(p + 8, true)
+    const compSize = view.getUint32(p + 18, true)
+    const nameLen = view.getUint16(p + 26, true)
+    const extraLen = view.getUint16(p + 28, true)
+    const name = new TextDecoder().decode(buffer.subarray(p + 30, p + 30 + nameLen))
+    const dataStart = p + 30 + nameLen + extraLen
+    const payload = buffer.subarray(dataStart, dataStart + compSize)
+    const data = method === 0 ? payload : await inflateRawAsync(payload)
+    entries.push({ name, data })
+    p = dataStart + compSize
+  }
+  return entries
+}
+
+async function extractDocxTextFromBytes(bytes: ArrayBuffer): Promise<string> {
+  const entries = await readDocxEntries(new Uint8Array(bytes))
+  const documentEntry = entries.find(entry => /^word\/document\.xml$/i.test(entry.name))
+  if (!documentEntry) throw new Error('DOCX 中缺少正文文件，可能不是有效的 Word 文档')
+  const xml = new TextDecoder('utf-8').decode(documentEntry.data)
+  const paragraphs: string[] = []
+  const paragraphMatches = xml.matchAll(/<w:p\b[\s\S]*?<\/w:p>/gi)
+  for (const paragraphMatch of paragraphMatches) {
+    const paragraphXml = paragraphMatch[0]
+    const texts: string[] = []
+    for (const runMatch of paragraphXml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/gi)) {
+      texts.push(decodeXmlEntities(runMatch[1]))
+    }
+    const line = texts.join('').replace(/\s+/g, ' ').trim()
+    if (line) paragraphs.push(line)
+  }
+  const contentText = paragraphs.join('\n\n').replace(/\u0000/g, '').trim()
+  if (!contentText) throw new Error('DOCX 中没有可读取的文字内容')
+  return contentText
+}
 
 const DEFAULT_SETTINGS = {
   newWordsTarget: 20,
@@ -148,6 +295,75 @@ function settings(): typeof DEFAULT_SETTINGS {
 
 function result(message = '该功能在移动版中暂不可用，请使用 Windows 桌面版'): { success: false; canceled: true; message: string } {
   return { success: false, canceled: true, message }
+}
+
+// Open the browser's native file picker. On mobile WebViews this resolves to the
+// system file chooser; no Electron main-process dialog is involved.
+function pickBrowserFile(accept: string): Promise<{ file: File } | null> {
+  return new Promise(resolvePick => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.style.display = 'none'
+    const cleanup = () => {
+      input.removeEventListener('change', onChange)
+      input.remove()
+    }
+    const onChange = () => {
+      const file = input.files?.[0]
+      cleanup()
+      resolvePick(file ? { file } : null)
+    }
+    input.addEventListener('change', onChange)
+    // Some mobile WebViews only honour the picker if the element is briefly in
+    // the DOM; attach it, then trigger the click on the next frame.
+    document.body.appendChild(input)
+    window.setTimeout(() => {
+      const opened = input.click()
+      void opened
+    }, 0)
+    // If the user cancels, some browsers fire no change event; resolve null after
+    // the picker would have closed so we do not hang the UI indefinitely.
+    window.setTimeout(() => {
+      if (!input.files?.length) {
+        cleanup()
+        resolvePick(null)
+      }
+    }, 30_000)
+  })
+}
+
+// Multi-file picker for the exam batch import. Returns staged opaque ids that
+// stand in for desktop file paths; the service pulls bytes back out on save.
+function pickBrowserFiles(accept: string): Promise<File[]> {
+  return new Promise(resolvePick => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.multiple = true
+    input.style.display = 'none'
+    const cleanup = () => {
+      input.removeEventListener('change', onChange)
+      input.remove()
+    }
+    const onChange = () => {
+      const files = Array.from(input.files || [])
+      cleanup()
+      resolvePick(files)
+    }
+    input.addEventListener('change', onChange)
+    document.body.appendChild(input)
+    window.setTimeout(() => {
+      const opened = input.click()
+      void opened
+    }, 0)
+    window.setTimeout(() => {
+      if (!input.files?.length) {
+        cleanup()
+        resolvePick([])
+      }
+    }, 30_000)
+  })
 }
 
 async function onlineLookup(query: string): Promise<any | null> {
@@ -610,6 +826,135 @@ function createApi(): Record<string, any> {
       return { success: false, message: '无法打开链接' }
     }
   }
+
+  // --- 移动端本地文献（浏览器选 PDF，字节存入 IndexedDB，应用内阅读器打开） ---
+  api.listLiterature = async () => literatureMetaList()
+
+  api.chooseLiteratureFile = async () => {
+    const picked = await pickBrowserFile('.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    if (!picked) return { canceled: true, message: '已取消选择文件' }
+    try {
+      const bytes = await picked.file.arrayBuffer()
+      const extension = picked.file.name.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf'
+      let contentText = ''
+      if (extension === 'docx') {
+        contentText = await extractDocxTextFromBytes(bytes)
+      }
+      const rows = await literatureMetaList()
+      const id = Math.max(100000, ...rows.map(item => item.id + 1))
+      const title = picked.file.name.replace(/\.(pdf|docx)$/i, '').trim() || '未命名文献'
+      const item: MobileLiteratureMeta = {
+        id,
+        title,
+        authors: '',
+        year: '',
+        source: picked.file.name,
+        abstract: contentText.slice(0, 1200),
+        content_text: contentText,
+        file_path: picked.file.name,
+        file_type: extension,
+        created_at: new Date().toISOString(),
+        size: bytes.byteLength
+      }
+      await putLiteratureBytes(id, bytes)
+      rows.unshift(item)
+      await saveLiteratureMetaList(rows)
+      return { success: true, item }
+    } catch (error) {
+      return { success: false, message: (error as Error).message || '文件导入失败' }
+    }
+  }
+
+  api.readLiteratureFile = async (id: number) => {
+    const bytes = await getLiteratureBytes(Number(id))
+    if (!bytes) throw new Error('本地文献不存在或已被移除')
+    return new Uint8Array(bytes)
+  }
+
+  api.deleteLiterature = async (id: number) => {
+    const rows = await literatureMetaList()
+    const filtered = rows.filter(item => Number(item.id) !== Number(id))
+    if (filtered.length === rows.length) return { success: false, message: '未找到文献' }
+    await deleteLiteratureBytes(Number(id)).catch(() => undefined)
+    await saveLiteratureMetaList(filtered)
+    return { success: true }
+  }
+
+  api.chooseLiteratureDirectory = async () => result('浏览器版本无法选择文件夹，请直接点击“打开文件”选择本地 PDF。')
+  api.setLiteratureAutoImportWatch = async () => ({ success: false, message: '浏览器版本不支持自动扫描文件夹。' })
+  api.showLiteratureInFolder = async () => ({ success: false, message: '浏览器版本没有本地文件夹位置。' })
+  api.renameLiteratureFile = async () => ({ success: false, message: '浏览器版本不支持重命名本地文件。' })
+
+  // --- 移动端真题合集（浏览器 sql.js 库 + IndexedDB 字节存储） ---
+  const EXAM_ACCEPT = '.pdf,application/pdf,.mp3,.wav,.m4a,.aac,.ogg,.flac,audio/*'
+
+  api.pickCollectionPdfs = async () => {
+    const files = await pickBrowserFiles(EXAM_ACCEPT)
+    if (!files.length) return { success: true, canceled: true, filePaths: [] }
+    const filePaths = stageExamFiles(files)
+    return { success: true, canceled: false, filePaths }
+  }
+  api.pickCollectionPdfFolder = async () => ({
+    success: true, canceled: true, folderPath: '', filePaths: [], warnings: [], truncated: false,
+    message: '浏览器版本无法选择文件夹，请直接选择 PDF 与听力文件。'
+  })
+  api.pickCollectionAudio = async () => {
+    const files = await pickBrowserFiles('.mp3,.wav,.m4a,.aac,.ogg,.flac,audio/*')
+    const file = files[0]
+    if (!file) return { success: true, canceled: true, filePath: '' }
+    return { success: true, canceled: false, filePath: stageExamFiles([file])[0] }
+  }
+  api.pickCollectionAudioFiles = async () => {
+    const files = await pickBrowserFiles('.mp3,.wav,.m4a,.aac,.ogg,.flac,audio/*')
+    if (!files.length) return { success: true, canceled: true, filePaths: [] }
+    return { success: true, canceled: false, filePaths: stageExamFiles(files) }
+  }
+
+  api.analyzeCollectionPdf = (filePath: string) => examImport.analyzePdf(filePath)
+  api.analyzeCollectionAudio = (filePath: string) => examImport.analyzeAudio(filePath)
+  api.saveCollectionPdfImport = (payload: any) => examImport.savePdfImport(payload)
+  api.saveCollectionAudioImport = (payload: any) => examImport.saveAudioImport(payload)
+  api.importCollectionAudio = (payload: any) => examImport.importCollectionAudio(payload)
+
+  api.getExamCollections = async () => ({ success: true, collections: await examImport.listCollections() })
+  api.getExamCollection = async (id: number) => {
+    const collection = await examImport.getCollection(Number(id))
+    return collection ? { success: true, collection } : { success: false, message: '真题合集不存在' }
+  }
+  api.getPendingAnalyses = async () => ({ success: true, pending: await examImport.listPendingAnalyses() })
+  api.reorderExamCollections = async (payload: { collectionIds: number[] }) => {
+    const collections = await examImport.reorderCollections(payload.collectionIds)
+    return { success: true, collections, message: '真题顺序已保存' }
+  }
+  api.bindPendingAnalysis = (payload: any) => examImport.bindPendingAnalysis(payload)
+  api.discardPendingAnalysis = (pendingId: number) => examImport.discardPendingAnalysis(Number(pendingId))
+  api.updateExamCollectionMetadata = (payload: any) => examImport.updateCollectionMetadata(payload)
+  api.deleteExamCollection = (collectionId: number) => examImport.deleteCollection(Number(collectionId))
+  api.showCollectionSource = async () => ({ success: false, message: '浏览器版本没有本地文件位置，无法在文件夹中显示。' })
+  api.getCollectionAudioData = (payload: any) => examImport.getCollectionAudioData(payload)
+  api.removeCollectionAudio = (payload: any) => examImport.removeCollectionAudio(payload)
+  api.readCollectionSourcePdf = async (filePath: string) => {
+    const record = await examImport.readExamFileBytes(String(filePath))
+    if (!record) return { success: false, message: '原 PDF 文件不存在' }
+    return { success: true, data: new Uint8Array(record.bytes) }
+  }
+  api.extractExamSegmentText = async (payload: any) => {
+    try {
+      const text = await examImport.extractSegmentText(String(payload.filePath), Number(payload.pageNo), payload.rects || [])
+      return { success: true, text }
+    } catch (error) {
+      return { success: false, message: (error as Error).message }
+    }
+  }
+
+  api.createManualExamSegment = (payload: any) => examImport.createManualSegment(payload)
+  api.updateExamSegment = (payload: any) => examImport.updateSegment(payload)
+  api.deleteExamSegment = (segmentId: number) => examImport.deleteSegment(Number(segmentId))
+
+  api.getExamAnnotations = (scopeKey: string) => examImport.listAnnotations(String(scopeKey))
+  api.addExamAnnotation = (payload: any) => examImport.addAnnotation(payload)
+  api.updateExamAnnotationGeometry = (payload: any) => examImport.updateAnnotationGeometry(payload)
+  api.deleteExamAnnotation = (id: number) => examImport.deleteAnnotation(Number(id))
 
   return api
 }

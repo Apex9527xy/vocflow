@@ -1,11 +1,13 @@
 import { app } from 'electron'
 import type { IpcMain } from 'electron'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { createWriteStream } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
+import { inflateRawSync } from 'node:zlib'
 import { prepareCloudUpdateEndpoint } from '../cloud/cloud-sync'
 import {
   candidateFromManifest as candidateFromManifestCore,
@@ -372,6 +374,7 @@ try {
   Start-Process -FilePath $exe -WorkingDirectory $Destination
   Log-Update 'update installed and application restarted'
   if ($originalMoved) { Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction SilentlyContinue }
+  Remove-Item -LiteralPath $Source -Recurse -Force -ErrorAction SilentlyContinue
 } catch {
   Log-Update ('update failed: ' + $_.Exception.ToString())
   if ($originalMoved) {
@@ -386,11 +389,99 @@ try {
   if (Test-Path -LiteralPath $exe) {
     Start-Process -FilePath $exe -WorkingDirectory $Destination
   }
+  Remove-Item -LiteralPath $Source -Recurse -Force -ErrorAction SilentlyContinue
   exit 1
 }
 `
   writeFileSync(scriptPath, `\uFEFF${script}`, 'utf8')
   return scriptPath
+}
+
+// Built-in ZIP reader/writer extraction on Node's zlib. The previous build used
+// a blocking `spawnSync('powershell.exe', Expand-Archive ...)` call to unpack the
+// update package; that froze the main process event loop on the ~47 MB archive,
+// which showed up as "程序未响应" and killed the install when the user/OS force
+// closed the window. We unpack with the runtime instead of shelling out.
+function unzipBufferToDir(buffer: Buffer, destDir: string): number {
+  let p = 0
+  let extracted = 0
+  const rootPrefix = resolve(destDir) + sep
+  while (p + 4 <= buffer.length && buffer.readUInt32LE(p) === 0x04034b50) {
+    const method = buffer.readUInt16LE(p + 8)
+    const compSize = buffer.readUInt32LE(p + 18)
+    const nameLen = buffer.readUInt16LE(p + 26)
+    const extraLen = buffer.readUInt16LE(p + 28)
+    const name = buffer.toString('utf8', p + 30, p + 30 + nameLen)
+    const dataStart = p + 30 + nameLen + extraLen
+    const payload = buffer.subarray(dataStart, dataStart + compSize)
+    const resolved = resolve(destDir, name)
+    if (!resolved.startsWith(rootPrefix)) {
+      throw new Error(`拒绝解压到目标目录之外：${name}`)
+    }
+    if (!name.endsWith('/')) {
+      writeFileSync(resolved, method === 0 ? Buffer.from(payload) : inflateRawSync(payload))
+      extracted += 1
+    }
+    p = dataStart + compSize
+  }
+  if (extracted === 0) throw new Error('更新包解压后未发现任何文件。')
+  return extracted
+}
+
+async function downloadToFile(url: string, destFile: string, signal: AbortSignal): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/octet-stream',
+      'User-Agent': `VocFlow/${app.getVersion()}`
+    },
+    signal,
+    redirect: 'follow'
+  })
+  if (!response.ok) throw new Error(`下载失败：HTTP ${response.status}`)
+  if (!validateRedirectUrl(response.url)) throw new Error('更新下载发生不安全跳转。')
+  const contentLength = Number(response.headers.get('content-length') || 0)
+  if (contentLength > MAX_UPDATE_BYTES) throw new Error('更新包超过允许大小。')
+
+  // Stream the archive to disk instead of holding the whole 47 MB in a single
+  // in-memory buffer; hash it incrementally as bytes arrive.
+  const hash = createHash('sha256')
+  let total = 0
+  const writer = createWriteStream(destFile)
+  const pump = new Promise<void>((resolveStream, rejectStream) => {
+    writer.on('error', rejectStream)
+    writer.on('finish', resolveStream)
+  })
+
+  if (response.body) {
+    const reader = response.body.getReader()
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = Buffer.from(value)
+        total += chunk.length
+        if (total > MAX_UPDATE_BYTES) throw new Error('更新包超过允许大小。')
+        hash.update(chunk)
+        await new Promise<void>((resolveWrite, rejectWrite) => {
+          if (!writer.write(chunk)) writer.once('drain', resolveWrite)
+          else resolveWrite()
+          writer.once('error', rejectWrite)
+        })
+      }
+    } catch (error) {
+      reader.cancel().catch(() => undefined)
+      writer.destroy()
+      throw error
+    }
+  } else {
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (buffer.length > MAX_UPDATE_BYTES) throw new Error('更新包超过允许大小。')
+    hash.update(buffer)
+    writer.write(buffer)
+  }
+  writer.end()
+  await pump
+  return hash.digest('hex')
 }
 
 async function launchUpdater(source: string, destination: string, executable: string): Promise<void> {
@@ -461,42 +552,31 @@ export function registerUpdateHandlers(ipcMain: IpcMain): void {
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 300_000)
+    const directory = mkdtempSync(join(tmpdir(), 'vocflow-download-'))
+    const zipPath = join(directory, 'VocFlow-update.zip')
+    let cleaned = false
+    const cleanup = () => {
+      if (cleaned) return
+      cleaned = true
+      try { rmSync(directory, { recursive: true, force: true }) } catch { /* ignore */ }
+    }
     try {
-      let buffer: Buffer
+      let actual: string
       if (downloadUrl.startsWith('file:')) {
         const file = fileURLToPath(downloadUrl)
         if (!existsSync(file) || !statSync(file).isFile()) throw new Error('本地更新包不存在。')
         if (statSync(file).size > MAX_UPDATE_BYTES) throw new Error('更新包超过允许大小。')
-        buffer = readFileSync(file)
+        const buffer = readFileSync(file)
+        writeFileSync(zipPath, buffer)
+        actual = createHash('sha256').update(buffer).digest('hex')
       } else {
-        const response = await fetch(downloadUrl, {
-          headers: {
-            Accept: 'application/octet-stream',
-            'User-Agent': `VocFlow/${state.currentVersion}`
-          },
-          signal: controller.signal,
-          redirect: 'follow'
-        })
-        if (!response.ok) throw new Error(`下载失败：HTTP ${response.status}`)
-        if (!validateRedirectUrl(response.url)) throw new Error('更新下载发生不安全跳转。')
-        const contentLength = Number(response.headers.get('content-length') || 0)
-        if (contentLength > MAX_UPDATE_BYTES) throw new Error('更新包超过允许大小。')
-        buffer = Buffer.from(await response.arrayBuffer())
+        actual = await downloadToFile(downloadUrl, zipPath, controller.signal)
       }
-      if (buffer.length > MAX_UPDATE_BYTES) throw new Error('更新包超过允许大小。')
-
-      const actual = createHash('sha256').update(buffer).digest('hex')
       if (actual !== sha256) throw new Error('更新包 SHA256 校验失败。')
 
-      const directory = mkdtempSync(join(tmpdir(), 'vocflow-download-'))
-      const zipPath = join(directory, 'VocFlow-update.zip')
-      writeFileSync(zipPath, buffer)
       const extractDir = join(directory, 'extracted')
-      const extract = spawnSync('powershell.exe', [
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
-        `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${extractDir.replace(/'/g, "''")}' -Force`
-      ], { windowsHide: true })
-      if (extract.status !== 0) throw new Error('更新包解压失败。')
+      const archive = readFileSync(zipPath)
+      unzipBufferToDir(archive, extractDir)
 
       const payload = resolve(extractDir, payloadDir)
       if (!isPathInside(extractDir, payload)) throw new Error('更新包目录无效。')
@@ -507,10 +587,13 @@ export function registerUpdateHandlers(ipcMain: IpcMain): void {
         throw new Error('更新包缺少应用主进程文件。')
       }
 
+      // Keep the staged payload for the updater script; the temp dir is removed
+      // by the updater after it finishes replacing files.
       await launchUpdater(payload, appRoot, basename(process.execPath))
       setTimeout(() => app.quit(), 900)
       return { success: true, message: '更新已下载并校验，应用即将重启完成安装。' }
     } catch (error) {
+      cleanup()
       return { success: false, message: (error as Error).message }
     } finally {
       clearTimeout(timer)

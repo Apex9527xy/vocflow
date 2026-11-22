@@ -252,6 +252,7 @@ async function submitRename(): Promise<void> {
 }
 
 function openContextMenu(event: MouseEvent, item: any): void {
+  if (mobile.value) return
   const width = 190
   const height = 174
   contextMenu.value = {
@@ -312,8 +313,11 @@ onUnmounted(() => {
     </div>
 
     <section v-if="mobile" class="mobile-notice">
-      <strong>手机端暂不支持本地 PDF 导入与内置文献库</strong>
-      <p>文献的本地导入、PDF 标注与摘录需要桌面端文件系统支持。你可以在下方选择在线文献站点，用浏览器检索阅读；完整文献功能请使用 Windows 桌面版。</p>
+      <strong>手机端可直接选择本地 PDF / Word 阅读</strong>
+      <p>点击下方“打开文件”，从手机存储中选择 PDF 或 DOCX，即可在应用内阅读、查词与摘录；文件仅保存在本机浏览器中，不会上传。</p>
+      <button class="open-file-btn mobile-import-btn" type="button" :disabled="importing" @click.stop="chooseLocalFile">
+        {{ importing ? '正在解析…' : '打开本地 PDF / Word 文件' }}
+      </button>
     </section>
 
     <section v-if="!mobile" class="path-panel">
@@ -347,7 +351,7 @@ onUnmounted(() => {
 
     <div v-if="notice" class="literature-notice">{{ notice }}</div>
 
-    <section v-if="!mobile" class="library-panel">
+    <section class="library-panel">
       <div class="library-heading">
         <div>
           <div class="section-kicker">SAVED LITERATURE</div>
@@ -360,7 +364,7 @@ onUnmounted(() => {
       <div v-else-if="!literatureItems.length" class="library-empty">
         <div class="empty-icon">▤</div>
         <strong>还没有保存文献</strong>
-        <span>将 PDF 文件放入上方自定义路径，或点击“打开文件”手动导入。</span>
+        <span>{{ mobile ? '点击上方“打开本地 PDF / Word 文件”导入一篇阅读。' : '将 PDF / Word 文件放入上方自定义路径，或点击“打开文件”手动导入。' }}</span>
       </div>
 
       <div v-else class="time-groups">
@@ -375,6 +379,7 @@ onUnmounted(() => {
               :key="item.id"
               class="literature-card"
               data-word-lookup-ignore
+              @click="openReader(item)"
               @dblclick="openReader(item)"
               @contextmenu.prevent.stop="openContextMenu($event, item)"
             >
@@ -392,8 +397,8 @@ onUnmounted(() => {
       @click.stop
     >
       <button type="button" @click="openReader(contextMenu.item)">打开文献</button>
-      <button type="button" :disabled="!contextMenu.item.file_path" @click="showLiteratureInFolder(contextMenu.item)">打开文件所在位置</button>
-      <button type="button" :disabled="!contextMenu.item.file_path" @click="openRenameDialog(contextMenu.item)">重命名</button>
+      <button v-if="!mobile" type="button" :disabled="!contextMenu.item.file_path" @click="showLiteratureInFolder(contextMenu.item)">打开文件所在位置</button>
+      <button v-if="!mobile" type="button" :disabled="!contextMenu.item.file_path" @click="openRenameDialog(contextMenu.item)">重命名</button>
       <button type="button" class="danger" @click="deleteLiterature(contextMenu.item)">删除</button>
     </div>
 
@@ -446,6 +451,7 @@ onUnmounted(() => {
 }
 .mobile-notice strong { display: block; color: var(--accent-dim); font-size: 14px; margin-bottom: 6px; }
 .mobile-notice p { color: var(--text-secondary); font-size: 12.5px; line-height: 1.7; }
+.mobile-import-btn { margin-top: 12px; width: 100%; }
 .path-panel { width: min(760px, 100%); margin-left: auto; margin-right: auto; }
 .path-label-row { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin-bottom: 8px; }
 .path-label-row span { color: var(--text-primary); font-size: 12px; font-weight: 700; }

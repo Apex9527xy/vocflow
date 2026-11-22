@@ -3,6 +3,7 @@
 declare const __VOCFLOW_USER_BUILD__: boolean
 declare const __VOCFLOW_MOBILE__: boolean
 declare const __VOCFLOW_CLOUD_ENDPOINT_JSON__: string
+declare const __VOCFLOW_SQLJS_WASM_URL__: string
 
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
