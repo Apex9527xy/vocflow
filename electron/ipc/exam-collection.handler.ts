@@ -738,6 +738,71 @@ export function registerExamCollectionHandlers(ipcMainRef: IpcMain, db: DbWrappe
           segment.paper_id === targetPaper.id && segment.content_type === 'paper' && ['auto_confirmed', 'confirmed'].includes(segment.status)
         ))
 
+        // A multi-set analysis PDF ("解析全3套") must be split per set instead of being
+        // bound to a single paper: every set gets its own analysis record and its
+        // segments land on the matching paper, so the reader can switch sets freely.
+        const setGroups = new Map<number, typeof segments>()
+        for (const segment of segments) {
+          const setNo = Number(segment.setNo)
+          if (!(setNo >= 1 && setNo <= 3)) continue
+          if (!setGroups.has(setNo)) setGroups.set(setNo, [])
+          setGroups.get(setNo)!.push(segment)
+        }
+
+        if (targetCollection && setGroups.size >= 2) {
+          const detail = repo.getCollection(targetCollection.id)
+          const boundSets: number[] = []
+          if (detail) {
+            for (const [setNo, group] of [...setGroups.entries()].sort((left, right) => left[0] - right[0])) {
+              const paper = detail.papers.find(item => item.paper_no === setNo)
+              if (!paper) continue
+              const hasContent = detail.segments.some(segment =>
+                segment.paper_id === paper.id && segment.content_type === 'paper' && ['auto_confirmed', 'confirmed'].includes(segment.status)
+              )
+              if (!hasContent) continue
+              const analysis = repo.ensureAnalysis({
+                collectionId: targetCollection.id,
+                paperId: paper.id,
+                audioSlot: payload.metadata.audioSlot,
+                title: `${targetCollection.title} · 卷${paper.paper_no}解析`,
+                sourceFilePath: payload.filePath,
+                sourceFileHash: fileHash,
+                fileName: basename(payload.filePath),
+                status: 'confirmed'
+              })
+              repo.insertSegments(group.map((segment, index) => ({
+                collectionId: targetCollection!.id,
+                paperId: paper.id,
+                analysisId: analysis.id,
+                audioSlot: segment.audioSlot || payload.metadata.audioSlot,
+                sourceFilePath: payload.filePath,
+                sourceFileHash: fileHash,
+                pageNo: Math.max(1, Number(segment.pageNo) || 1),
+                rangeInfo: segment.rangeInfo,
+                contentType: 'analysis' as const,
+                textExcerpt: segment.textExcerpt || '',
+                segmentOrder: index + 1,
+                confidence: Math.max(0.86, Number(segment.confidence) || 0),
+                status: 'auto_confirmed' as const,
+                manualOverride: false
+              })))
+              boundSets.push(paper.paper_no)
+            }
+            if (boundSets.length) {
+              const updated = repo.recalculateStatus(targetCollection.id)
+              saveDatabase()
+              return {
+                success: true,
+                bound: true,
+                splitSets: boundSets,
+                collectionId: updated.id,
+                collection: repo.getCollection(updated.id),
+                message: `解析已按 ${boundSets.length} 套拆分并绑定到 ${targetCollection.title} 的卷 ${boundSets.join(' / ')}`
+              }
+            }
+          }
+        }
+
         if (targetCollection && targetPaper && hasPaperContent) {
           const analysisStatus = 'confirmed' as const
           const analysis = repo.ensureAnalysis({

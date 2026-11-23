@@ -428,7 +428,7 @@ onMounted(loadCollections)
 
     <section class="summary-strip">
       <div><span>合集</span><strong>{{ summary.collections }}</strong></div><div><span>卷子</span><strong>{{ summary.papers }}</strong></div><div><span>待核对片段</span><strong>{{ summary.pending }}</strong></div><div><span>可用合集</span><strong>{{ summary.complete }}</strong></div>
-      <label class="search"><span>⌕</span><input v-model="query" type="search" :placeholder="examSection === 'basic' ? '搜索年级、年份或合集名称' : '搜索年份、场次、合集名称'" /></label>
+      <label class="search"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14" /><path d="M21 21l-4.35-4.35" /></svg></span><input v-model="query" type="search" :placeholder="examSection === 'basic' ? '搜索年级、年份或合集名称' : '搜索年份、场次、合集名称'" /></label>
       <button class="pending-filter" :class="{ active: selectedType === 'unknown' }" type="button" @click="selectedType = 'unknown'">待分类</button>
       <button class="all-filter" :class="{ active: selectedType === 'all' }" type="button" @click="selectedType = 'all'">全部合集</button>
     </section>
@@ -483,5 +483,7 @@ onMounted(loadCollections)
 .grade-picker { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 9px; border: 1px solid rgba(217,119,6,.2); border-radius: 8px; color: var(--accent-dim); background: rgba(217,119,6,.06); font-size: 8px; font-weight: 700; }
 .grade-picker select { max-width: 100px; padding: 4px 20px 4px 6px; border: 0; border-radius: 6px; outline: none; color: var(--text-primary); background: var(--bg-card); font-size: 8px; font-weight: 700; cursor: pointer; }
 .category-grid.two-cards { grid-template-columns: repeat(2,minmax(0,1fr)); max-width: 920px; margin-inline: auto; }
+.search span { display: flex; align-items: center; flex-shrink: 0; }
+.search span svg { width: 11px; height: 11px; }
 @media(max-width:1050px){.category-grid,.category-grid.two-cards{grid-template-columns:repeat(2,minmax(0,1fr));}.summary-strip{flex-wrap:wrap;}.search{margin-left:0;}.page-header{align-items:flex-start;flex-direction:column;}}
 </style>

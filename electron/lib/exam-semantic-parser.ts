@@ -89,6 +89,36 @@ function parseSetNo(value: string): number | null {
   return map[chinese[1] || chinese[2]] || null
 }
 
+/**
+ * Multi-set analysis files ("解析全3套") ship every set inside one PDF and mark the
+ * set in the page footer, e.g. "四级 2023.3 一套". Only the page tail is inspected so
+ * body sentences such as "一套新的雇主标准" cannot be mistaken for a set marker.
+ */
+function detectPageSetNo(pageText: string): number | null {
+  const tail = pageText.slice(-90)
+  const digit = tail.match(/[^\d年]?\s*([1-3])\s*套/)
+  if (digit) return Number(digit[1])
+  const chinese = tail.match(/([一二三])\s*套/)
+  if (chinese) {
+    const map: Record<string, number> = { 一: 1, 二: 2, 三: 3 }
+    return map[chinese[1]] || null
+  }
+  return null
+}
+
+/** Per-page set number, filled forward so pages without a footer marker inherit the current set. */
+function buildPageSetMap(pages: TextLine[][]): Map<number, number> {
+  const map = new Map<number, number>()
+  let current = 1
+  for (let index = 0; index < pages.length; index++) {
+    const pageText = pages[index].map(line => line.text).join(' ')
+    const detected = detectPageSetNo(pageText)
+    if (detected) current = detected
+    map.set(index + 1, current)
+  }
+  return map
+}
+
 function detectAudioSlot(value: string): 'A' | 'B' | null {
   const text = normalizeText(value)
   const match = text.match(/(?:听力|音频|录音)\s*([AB])|([AB])\s*(?:卷|音频|听力)/i)
@@ -431,27 +461,43 @@ export async function analyzeExamPdf(filePath: string): Promise<ExamPdfSemanticA
   const profile = inferDocumentRole(basename(filePath), fullText, extracted.pages)
   let segments = autoConfirmSegmentRoles(normalizeDocumentSegments(basename(filePath), buildSegments(extracted.pages, profile), profile), profile)
 
+  // A single PDF can hold several sets ("解析全3套"). Page footers carry the set number,
+  // so analysis segments are re-tagged with the set of the page they start on; the save
+  // handler then splits them into one bound analysis record per paper.
+  if (segments.length && (profile.role === 'analysis' || looksLikeStandaloneAnalysisFile(basename(filePath)))) {
+    const pageSetMap = buildPageSetMap(extracted.pages)
+    const detectedSets = new Set([...pageSetMap.values()])
+    if (detectedSets.size > 1) {
+      segments = segments.map(segment => {
+        const pageNo = Math.max(1, Number(segment.pageNo) || 1)
+        const setNo = pageSetMap.get(pageNo) || segment.setNo
+        return { ...segment, setNo }
+      })
+    }
+  }
+
   if (!segments.length && extracted.pageCount > 0) {
-    // 无文字层的扫描版 PDF 仍可依据文件名与页面排版特征推断文档角色。
-    // 解析类文件绝不能因为未识别出文字片段而回落成真题卷。
-    segments = [{
-      contentType: profile.role === 'analysis' ? 'analysis' : 'paper',
-      pageNo: 1,
+    // 无文字层的扫描版 PDF：按页生成占位片段，让解析面板能逐页翻阅整份解析，
+    // 而不是只显示第一页。角色仍按文件名/版式判定，绝不回落成真题卷。
+    const role: SegmentContentType = profile.role === 'analysis' ? 'analysis' : 'paper'
+    segments = Array.from({ length: extracted.pageCount }, (_, index) => ({
+      contentType: role,
+      pageNo: index + 1,
       rangeInfo: {
-        coordinateSpace: 'normalized-0-1',
-        source: 'native_text',
+        coordinateSpace: 'normalized-0-1' as const,
+        source: 'native_text' as const,
         textStart: 0,
         textEnd: 0,
-        rects: [{ pageNo: 1, x: 0.05, y: 0.05, width: 0.9, height: 0.9 }],
+        rects: [{ pageNo: index + 1, x: 0.05, y: 0.05, width: 0.9, height: 0.9 }],
         lineCount: 0
       },
       textExcerpt: '',
       confidence: Math.max(0.72, profile.confidence),
-      status: 'auto_confirmed',
-      segmentOrder: 1,
+      status: 'auto_confirmed' as const,
+      segmentOrder: index + 1,
       setNo: metadata.setNo,
       audioSlot: metadata.audioSlot
-    }]
+    }))
   }
 
   return {

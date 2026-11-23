@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUiStore } from '../../stores/ui.store'
+import NavIcon from './NavIcon.vue'
 
 interface NavItem {
   path: string
@@ -22,19 +23,19 @@ onUnmounted(() => mobileQuery.removeEventListener('change', syncMobileLayout))
 const navOrderKey = 'vocflow-nav-order'
 
 const defaultNavItems: NavItem[] = [
-  { path: '/', label: '今日', icon: '◈' },
-  { path: '/study', label: '新词', icon: '◎' },
-  { path: '/review', label: '复习', icon: '↻' },
-  { path: '/wrong-words', label: '错词/收藏', icon: '✕' },
-  { path: '/search', label: '查词', icon: '⌕' },
-  { path: '/stats', label: '统计', icon: '▤' },
-  { path: '/plan', label: '计划', icon: '▦' },
-  { path: '/exam', label: '真题', icon: '▣' },
-  { path: '/literature', label: '文献阅读', icon: '▧' },
-  { path: '/focus', label: '专注', icon: '◉' },
+  { path: '/', label: '今日', icon: 'today' },
+  { path: '/study', label: '新词', icon: 'study' },
+  { path: '/review', label: '复习', icon: 'review' },
+  { path: '/wrong-words', label: '错词/收藏', icon: 'wrong' },
+  { path: '/search', label: '查词', icon: 'search' },
+  { path: '/stats', label: '统计', icon: 'stats' },
+  { path: '/plan', label: '计划', icon: 'plan' },
+  { path: '/exam', label: '真题', icon: 'exam' },
+  { path: '/literature', label: '文献阅读', icon: 'literature' },
+  { path: '/focus', label: '专注', icon: 'focus' },
 
 
-  { path: '/settings', label: '设置', icon: '⚙' }
+  { path: '/settings', label: '设置', icon: 'settings' }
 ]
 
 function restoreNavItems(): NavItem[] {
@@ -134,7 +135,7 @@ function handleNavClick(event: MouseEvent, item: NavItem): void {
         @drop.prevent.stop="handleDrop($event, item)"
         @dragend.stop="handleDragEnd"
       >
-        <span class="nav-icon">{{ item.icon }}</span>
+        <span class="nav-icon"><NavIcon :name="item.icon" /></span>
         <span v-if="!uiStore.sidebarCollapsed || isMobile" class="nav-label">{{ item.label }}</span>
       </router-link>
     </div>
@@ -278,6 +279,9 @@ function handleNavClick(event: MouseEvent, item: NavItem): void {
   text-align: center;
   flex-shrink: 0;
   opacity: 0.6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .nav-item.active .nav-icon {

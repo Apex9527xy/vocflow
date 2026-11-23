@@ -38,6 +38,30 @@ const activePaper = computed(() => isMiddleSchool.value ? (collection.value?.pap
 const activeSegments = computed(() => collection.value?.segments.filter(segment => (segment.paper_id === activePaper.value?.id || segment.paper_id == null) && ['auto_confirmed', 'confirmed'].includes(segment.status)) || [])
 const examSegments = computed(() => activeSegments.value.filter(segment => segment.content_type === 'paper'))
 const analysisSegments = computed(() => activeSegments.value.filter(segment => segment.content_type === 'analysis' && (!segment.audio_slot || segment.audio_slot === activeAudioSlot.value)))
+// Analysis column pages through the analysis PDF itself (scanned analysis PDFs have
+// no text layer, so only continuous page rendering can show every page). When the
+// current paper's analysis lives in a page window of a multi-set PDF, honor that window.
+const analysisSourceFiles = computed<Array<{ path: string; fileName: string }>>(() => {
+  const detail = collection.value
+  if (!detail) return []
+  const known = detail.sourceFiles || []
+  const collect = (segments: ExamContentSegmentRecord[]): string[] => [...new Set(segments
+    .filter(segment => segment.content_type === 'analysis' && segment.source_file_path)
+    .map(segment => segment.source_file_path))]
+  let paths = collect(analysisSegments.value)
+  if (!paths.length) paths = collect(detail.segments)
+  return paths.map(path => ({
+    path,
+    fileName: known.find(file => file.path === path)?.fileName || String(path).split(/[/\\]/).pop() || path
+  }))
+})
+const analysisPageRange = computed<[number, number] | null>(() => {
+  const pages = analysisSegments.value.map(segment => Math.max(1, Number(segment.page_no) || 1))
+  if (!pages.length) return null
+  return [Math.min(...pages), Math.max(...pages)]
+})
+
+const audioForSlot = computed(() => collection.value?.audio.find(item => item.audio_slot === activeAudioSlot.value) || null)
 const pendingSegments = computed(() => collection.value?.segments.filter(segment => segment.status === 'pending_review') || [])
 
 // Source PDFs to page through continuously in the paper column: prefer the ones
@@ -62,7 +86,6 @@ const paperSourceFiles = computed<Array<{ path: string; fileName: string }>>(() 
   }))
 })
 
-const audioForSlot = computed(() => collection.value?.audio.find(item => item.audio_slot === activeAudioSlot.value) || null)
 const audioTime = computed(() => `${formatTime(currentTime.value)} / ${duration.value ? formatTime(duration.value) : '--:--'}`)
 const audioProgress = computed(() => duration.value ? Math.min(100, currentTime.value / duration.value * 100) : 0)
 const audioProgressStyle = computed(() => ({ '--audio-progress': `${audioProgress.value}%` }))
@@ -266,7 +289,7 @@ watch(activeAudioSlot, () => { if (collection.value) void prepareAudio() })
         <section v-if="showAnalysis" class="reading-column analysis-column">
           <header><strong>对应解析</strong><span>当前听力 {{ activeAudioSlot }}</span></header>
           <div v-if="!analysisSegments.length" class="column-state">当前卷子还没有可用解析片段。</div>
-          <ExamSegmentPdfPane v-else :collection-id="props.collectionId" :paper-id="activePaper?.id || 0" :segments="analysisSegments" role="analysis" label="对应解析" :zoom="readerZoom" :active-ink-tool="activeInkTool" :ink-color="inkColor" :ink-line-width="inkLineWidth" :eraser-size="inkEraserSize" />
+          <ExamSegmentPdfPane v-else :collection-id="props.collectionId" :paper-id="activePaper?.id || 0" :segments="analysisSegments" role="analysis" label="对应解析" :zoom="readerZoom" :active-ink-tool="activeInkTool" :ink-color="inkColor" :ink-line-width="inkLineWidth" :eraser-size="inkEraserSize" :render-all-pages="true" :source-files="analysisSourceFiles" :page-range="analysisPageRange" />
         </section>
       </main>
 

@@ -401,7 +401,7 @@ interface Cet4Api {
   analyzeCollectionPdf: (filePath: string) => Promise<{ success: boolean; analysis?: CollectionPdfAnalysisResult; duplicateCollectionId?: number | null; message?: string }>
   analyzeCollectionAudio: (filePath: string) => Promise<{ success: boolean; audio?: CollectionAudioAnalysisResult; message?: string }>
   saveCollectionAudioImport: (payload: any) => Promise<{ success: boolean; collectionId?: number; audio?: ExamCollectionAudio; duplicate?: boolean; message: string }>
-  saveCollectionPdfImport: (payload: any) => Promise<{ success: boolean; duplicate?: boolean; pendingBinding?: boolean; pendingId?: number; bound?: boolean; paperNo?: number; collectionId?: number; collection?: ExamCollectionDetail; message: string }>
+  saveCollectionPdfImport: (payload: any) => Promise<{ success: boolean; duplicate?: boolean; pendingBinding?: boolean; pendingId?: number; bound?: boolean; paperNo?: number; splitSets?: number[]; collectionId?: number; collection?: ExamCollectionDetail; message: string }>
   getExamCollections: () => Promise<{ success: boolean; collections: ExamCollectionSummary[]; message?: string }>
   reorderExamCollections: (payload: { collectionIds: number[] }) => Promise<{ success: boolean; collections?: ExamCollectionSummary[]; message?: string }>
   getPendingAnalyses: () => Promise<{ success: boolean; pending: PendingAnalysisImport[]; message?: string }>

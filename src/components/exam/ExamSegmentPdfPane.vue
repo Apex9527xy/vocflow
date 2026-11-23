@@ -19,6 +19,11 @@ const props = defineProps<{
   renderAllPages?: boolean
   /** Source PDFs of the collection, used by renderAllPages to know what to open. */
   sourceFiles?: Array<{ path: string; fileName: string }>
+  /**
+   * Optional page window for renderAllPages, e.g. one set of a multi-set PDF.
+   * When omitted the whole source PDF is paged through.
+   */
+  pageRange?: [number, number] | null
 }>()
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./assets/pdf.worker.min.mjs', window.location.href).href
@@ -95,9 +100,12 @@ const pageReferences = computed<PageReference[]>(() => {
   if (props.renderAllPages) {
     const output: PageReference[] = []
     let order = 0
+    const range = props.pageRange
     for (const source of displaySources.value) {
       const total = pageCountBySource.value[source.path] || 0
-      for (let pageNo = 1; pageNo <= total; pageNo++) {
+      const start = range ? Math.max(1, Math.min(total || range[0], range[0])) : 1
+      const end = range ? Math.max(start, Math.min(total || range[1], range[1])) : total
+      for (let pageNo = start; pageNo <= end; pageNo++) {
         output.push({
           key: `${source.path}#${pageNo}`,
           sourceFilePath: source.path,
@@ -630,7 +638,8 @@ watch(() => [
   props.segments.map(segment => segment.id).join(','),
   scopeKey.value,
   props.renderAllPages ? '1' : '0',
-  (props.sourceFiles || []).map(item => item.path).join(',')
+  (props.sourceFiles || []).map(item => item.path).join(','),
+  props.pageRange ? `${props.pageRange[0]}-${props.pageRange[1]}` : ''
 ], async () => {
   await loadInkRecords()
   loading.value = true
