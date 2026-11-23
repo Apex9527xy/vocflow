@@ -187,6 +187,15 @@ function buildVueModule(id, source) {
 
 const plugins = [
   {
+    name: 'cet4-sqljs-desktop-stub',
+    resolveId(source) {
+      // The mobile data layer is bundled for the PWA only; desktop resolves a stub so
+      // Rollup never has to transform sql.js's UMD/CJS distribution.
+      if (source === 'sql.js') return path.join(root, 'scripts', 'sqljs-desktop-stub.mjs')
+      return null
+    }
+  },
+  {
     name: 'cet4-resolver',
     resolveId(source, importer) {
       const resolved = resolveId(source, importer)

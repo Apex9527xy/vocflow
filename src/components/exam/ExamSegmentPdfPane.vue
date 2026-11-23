@@ -346,6 +346,74 @@ function renderNearbyPages(): void {
   }
 }
 
+function clampUnit(value: any): number {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.min(1, Math.max(0, numeric))
+}
+
+/** OCR is a desktop capability: the PWA has no `ocrExamPdfPage` bridge. */
+const OCR_SUPPORTED = typeof window !== 'undefined' && typeof (window as any).cet4Api?.ocrExamPdfPage === 'function'
+
+/**
+ * Scanned pages carry no native text layer. Recognise the page bitmap once in the main process,
+ * then lay those lines over the canvas as invisible text: the existing character-indexed selection
+ * engine can drive selection, double-click lookup and annotations exactly like a text PDF.
+ */
+async function renderOcrTextLayer(view: SegmentPageView, viewport: any, token: number): Promise<void> {
+  const ocr = (window as any).cet4Api?.ocrExamPdfPage
+  if (typeof ocr !== 'function') return
+  const status = document.createElement('div')
+  status.className = 'segment-pdf-ocr-status'
+  status.textContent = '扫描页 · 正在识别文字…'
+  view.shell.appendChild(status)
+  view.layer.classList.add('segment-pdf-text-layer--ocr')
+  let payload: any = null
+  try {
+    payload = await ocr({ filePath: view.reference.sourceFilePath, pageNo: view.reference.pageNo })
+  } catch (ocrError) {
+    payload = { success: false, message: (ocrError as Error)?.message }
+  }
+  if (token !== view.token) {
+    status.remove()
+    view.layer.classList.remove('segment-pdf-text-layer--ocr')
+    return
+  }
+  const lines = Array.isArray(payload?.lines) ? payload.lines : []
+  if (!payload?.success || !lines.length) {
+    status.textContent = payload?.message ? `扫描页 · ${payload.message}` : '扫描页 · 未能识别文字'
+    status.classList.add('is-failed')
+    setTimeout(() => status.remove(), 3200)
+    return
+  }
+  const created: Array<{ span: HTMLSpanElement; line: any }> = []
+  for (const line of lines) {
+    if (!line || typeof line.text !== 'string' || !line.text.trim()) continue
+    const span = document.createElement('span')
+    span.className = 'segment-pdf-ocr-line'
+    span.textContent = line.text
+    span.style.left = `${(clampUnit(line.x) * 100).toFixed(4)}%`
+    span.style.top = `${(clampUnit(line.y) * 100).toFixed(4)}%`
+    span.style.fontSize = `${Math.max(3, clampUnit(line.height) * viewport.height * 1.04).toFixed(2)}px`
+    view.layer.appendChild(span)
+    created.push({ span, line })
+  }
+  // Second pass: stretch every line onto its OCR box, so character hit-testing matches the scan.
+  for (const { span, line } of created) {
+    const natural = span.getBoundingClientRect().width
+    const target = clampUnit(line.width) * viewport.width
+    if (natural > 0.5 && target > 0.5) {
+      const ratio = Math.min(4, Math.max(0.25, target / natural))
+      span.style.transform = `scaleX(${ratio.toFixed(4)})`
+    }
+  }
+  status.textContent = payload.cached
+    ? `扫描页 · 已识别 ${created.length} 行文字`
+    : `扫描页 · 识别完成 ${created.length} 行（可选中/查词）`
+  status.classList.add('is-done')
+  setTimeout(() => status.remove(), 2400)
+}
+
 async function renderPage(view: SegmentPageView): Promise<void> {
   if (view.rendering) return
   const pdfDocument = await getPdfDocument(view.reference.sourceFilePath)
@@ -386,15 +454,23 @@ async function renderPage(view: SegmentPageView): Promise<void> {
     const textContent = await page.getTextContent()
     if (token !== view.token) return
     view.layer.innerHTML = ''
-    const textDivs: HTMLSpanElement[] = []
-    await pdfjsLib.renderTextLayer({
-      textContentSource: textContent,
-      container: view.layer,
-      viewport,
-      textDivs,
-      isOffscreenCanvasSupported: true
-    }).promise
-    annotatePdfTextLayer(view.layer, textContent.items, textDivs, view.reference.pageNo)
+    view.layer.classList.remove('segment-pdf-text-layer--ocr')
+    const textItems = (textContent?.items || []) as any[]
+    const hasNativeText = textItems.some(item => typeof item?.str === 'string' && item.str.trim())
+    if (hasNativeText) {
+      const textDivs: HTMLSpanElement[] = []
+      await pdfjsLib.renderTextLayer({
+        textContentSource: textContent,
+        container: view.layer,
+        viewport,
+        textDivs,
+        isOffscreenCanvasSupported: true
+      }).promise
+      annotatePdfTextLayer(view.layer, textContent.items, textDivs, view.reference.pageNo)
+    } else if (OCR_SUPPORTED) {
+      await renderOcrTextLayer(view, viewport, token)
+      if (token !== view.token) return
+    }
     if (!firstPageReady.value) {
       firstPageReady.value = true
       textInteractionReady.value = true
@@ -712,6 +788,10 @@ onBeforeUnmount(() => {
 :global(.segment-pdf-text-layer span), :global(.segment-pdf-text-layer br) { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0% 0%; }
 :global(.segment-pdf-text-layer ::selection) { background: rgba(37,99,235,.34); }
 :global(.segment-pdf-text-layer .endOfContent) { display: block; position: absolute; inset: 100% 0 0; z-index: -1; cursor: default; user-select: none; }
+:global(.segment-pdf-text-layer--ocr .segment-pdf-ocr-line) { line-height: 1; font-family: system-ui, "Segoe UI", sans-serif; }
+:global(.segment-pdf-ocr-status) { position: absolute; left: 8px; bottom: 8px; z-index: 30; padding: 4px 9px; border-radius: 999px; background: rgba(255,250,241,.96); color: #8a6a3c; font-size: 10px; box-shadow: 0 3px 10px rgba(44,36,32,.16); pointer-events: none; }
+:global(.segment-pdf-ocr-status.is-done) { color: #2f7a4d; }
+:global(.segment-pdf-ocr-status.is-failed) { color: #b1423a; }
 .pdf-loading-overlay { position:absolute; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; gap:9px; color:var(--text-secondary); background:rgba(233,229,223,.92); font-size:11px; }.pdf-loading-spinner { width:18px; height:18px; border:2px solid rgba(217,119,6,.2); border-top-color:var(--accent); border-radius:50%; animation:pdf-pane-spin .7s linear infinite; }@keyframes pdf-pane-spin { to { transform:rotate(360deg); } }
 .pdf-rendering-pill { position: sticky; bottom: 8px; width: fit-content; margin: 10px auto 0; padding: 5px 9px; border-radius: 999px; color: var(--accent-dim); background: rgba(255,250,241,.96); box-shadow: 0 4px 14px rgba(44,36,32,.12); font-size: 8px; }
 .pdf-text-ready-mask { position:absolute; inset:0; z-index:21; display:flex; align-items:center; justify-content:center; gap:9px; color:var(--text-secondary); background:rgba(233,229,223,.84); font-size:10px; }

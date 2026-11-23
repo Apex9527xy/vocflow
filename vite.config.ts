@@ -30,6 +30,25 @@ function copyPreload(): import('vite').Plugin {
 }
 
 export default defineConfig({
+  // Electron 35 runs Chromium 134; the legacy es2020 target made pdfjs-dist's top-level
+  // await an outright build error. esnext keeps the desktop bundles buildable.
+  build: {
+    target: 'esnext',
+    // sql.js ships a UMD/CJS bundle; the mixed-module transform is what lets the desktop
+    // renderer bundle the shared mobile exam module instead of failing on its default export.
+    commonjsOptions: {
+      transformMixedEsModules: true
+    }
+  },
+  // pdfjs-dist ships top-level await; the dependency pre-bundler needs the same modern target.
+  esbuild: {
+    target: 'esnext'
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext'
+    }
+  },
   define: {
     __VOCFLOW_USER_BUILD__: JSON.stringify(userBuild),
     __VOCFLOW_MOBILE__: JSON.stringify(false),
@@ -41,10 +60,16 @@ export default defineConfig({
       {
         entry: 'electron/main.ts',
         vite: {
+          define: {
+            __VOCFLOW_USER_BUILD__: JSON.stringify(userBuild),
+            __VOCFLOW_MOBILE__: JSON.stringify(false),
+            __VOCFLOW_CLOUD_ENDPOINT_JSON__: JSON.stringify(cloudEndpoint)
+          },
           build: {
             outDir: 'dist-electron',
+            target: 'esnext',
             rollupOptions: {
-              external: ['sql.js', 'canvas', 'pdfjs-dist']
+              external: ['sql.js', 'canvas', 'pdfjs-dist', 'tesseract.js', 'tesseract.js-core']
             }
           }
         }

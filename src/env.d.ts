@@ -394,6 +394,7 @@ interface Cet4Api {
   addExamAnnotation: (payload: any) => Promise<{ success: boolean; id?: number; annotation?: any; message?: string }>
   updateExamAnnotationGeometry: (payload: { id: number; geometry: any }) => Promise<{ success: boolean; message?: string }>
   deleteExamAnnotation: (id: number) => Promise<{ success: boolean; message?: string }>
+  ocrExamPdfPage: (payload: { filePath: string; pageNo: number }) => Promise<{ success: boolean; pageNo: number; width: number; height: number; lines: Array<{ text: string; x: number; y: number; width: number; height: number; confidence: number }>; cached: boolean; message?: string }>
   pickCollectionPdfs: () => Promise<{ success: boolean; canceled: boolean; filePaths: string[] }>
   pickCollectionPdfFolder: () => Promise<{ success: boolean; canceled: boolean; folderPath: string; filePaths: string[]; warnings: string[]; truncated: boolean; message?: string }>
   pickCollectionAudio: () => Promise<{ success: boolean; canceled: boolean; filePath: string }>

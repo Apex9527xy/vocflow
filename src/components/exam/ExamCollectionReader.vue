@@ -6,7 +6,9 @@ import type { PdfInkTool } from '../../lib/pdf-ink'
 import { examPaperTypeLabel, examSeasonLabel } from '../../lib/examMetadata'
 
 const props = defineProps<{ collectionId: number; type?: string }>()
-const appIconUrl = new URL('./assets/icon.png', window.location.href).href
+// public/icon.png is copied to the build root, so resolve it against the app base
+// instead of ./assets/ — that path never existed and left a broken image in the header.
+const appIconUrl = new URL('icon.png', document.baseURI).href
 const emit = defineEmits<{ (event: 'close'): void; (event: 'annotate', collection: ExamCollectionDetail): void }>()
 
 const collection = ref<ExamCollectionDetail | null>(null)

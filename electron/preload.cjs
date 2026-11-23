@@ -168,6 +168,9 @@ const api = {
   getExamQuestionCount: function(sectionType) { return invokeIpc("exam:getQuestionCount", sectionType); },
   getExamSectionCounts: function() { return invokeIpc("exam:getSectionCounts"); },
 
+  // 扫描版解析 PDF 的文字识别（内置 OCR），用于补出可选中/可查词的文字层
+  ocrExamPdfPage: function(payload) { return invokeIpc("exam:ocrPage", payload); },
+
   saveExamWrongAnswers: function(paperId, wrongs) { return invokeIpc("exam:saveWrongAnswers", paperId, wrongs); },
   getExamWrongAnswers: function(filters) { return invokeIpc("exam:getWrongAnswers", filters); },
   getExamWrongAnswerCount: function(filters) { return invokeIpc("exam:getWrongAnswerCount", filters); },

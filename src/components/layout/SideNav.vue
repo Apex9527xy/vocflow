@@ -12,7 +12,7 @@ interface NavItem {
 
 const route = useRoute()
 const uiStore = useUiStore()
-const brandIconUrl = new URL('./icon.png', window.location.href).href
+const brandIconUrl = new URL('icon.png', document.baseURI).href
 const mobileQuery = window.matchMedia('(max-width: 720px)')
 const isMobile = ref(mobileQuery.matches)
 function syncMobileLayout(event: MediaQueryListEvent): void {

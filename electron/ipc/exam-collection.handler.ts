@@ -9,6 +9,7 @@ import { detectMetadata, examSeasonLabel, isExamPaperType, normalizeExamSeason, 
 import { analyzeExamPdf, extractTextInPdfRects, type ExamPdfSemanticAnalysis, type SemanticRangeRect, type SemanticSegment, type SegmentContentType, type SegmentStatus } from '../lib/exam-semantic-parser'
 import { saveDatabase } from '../database/connection'
 import { collectCollectionImportFiles } from '../lib/exam-folder'
+import { ocrPdfPage } from '../lib/pdf-ocr'
 
 function normalizeYear(value: unknown): number | null {
   const year = Number(value)
@@ -498,6 +499,18 @@ export function registerExamCollectionHandlers(ipcMainRef: IpcMain, db: DbWrappe
   ipcMainRef.handle('exam:annotations:delete', (_event, id: number) => {
     try { db.prepare('DELETE FROM exam_annotations WHERE id = ?').run(id); saveDatabase(); return { success: true } }
     catch (error) { return { success: false, message: (error as Error).message } }
+  })
+
+  // 扫描版解析 PDF：按页 OCR，返回归一化到页面坐标的文字行，供阅读器叠加透明文字层。
+  ipcMainRef.handle('exam:ocrPage', async (_event, payload: { filePath?: string; pageNo?: number }) => {
+    try {
+      const filePath = String(payload?.filePath || '').trim()
+      const pageNo = Math.max(1, Math.floor(Number(payload?.pageNo) || 1))
+      if (!filePath) return { success: false, pageNo, width: 0, height: 0, lines: [], cached: false, message: '缺少 PDF 路径' }
+      return await ocrPdfPage(filePath, pageNo)
+    } catch (error) {
+      return { success: false, pageNo: 1, width: 0, height: 0, lines: [], cached: false, message: (error as Error).message }
+    }
   })
 
   ipcMainRef.handle('exam:collections:pickPdfs', async () => {
