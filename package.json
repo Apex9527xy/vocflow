@@ -1,6 +1,6 @@
 {
   "name": "vocflow",
-  "version": "2.9.15",
+  "version": "2.9.16",
   "description": "VocFlow - 智能英语词汇与句式学习工具",
   "main": "dist-electron/main.js",
   "type": "module",
