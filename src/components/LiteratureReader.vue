@@ -6,7 +6,7 @@ import { PdfInkManager, parsePdfInkRecord, serializePdfInkStroke, type PdfInkStr
 import { annotatePdfTextLayer, applyPdfTextSelection, pdfSelectionClientRect, pdfSelectionLooksLikeWholePage, pdfSelectionPointAt, type PdfSelectionPoint, type PdfSelectionResult } from '../lib/pdf-selection-engine'
 
 const props = defineProps<{ item: any }>()
-const appIconUrl = new URL('./assets/icon.png', window.location.href).href
+const appIconUrl = new URL('icon.png', document.baseURI).href
 const emit = defineEmits<{ (event: 'close'): void }>()
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('./assets/pdf.worker.min.mjs', window.location.href).href
