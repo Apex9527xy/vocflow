@@ -41,7 +41,10 @@
     "vue-router": "^4.5.0",
     "@capacitor/core": "^8.6.2",
     "@capacitor/android": "^8.6.2",
-    "@capacitor/ios": "^8.6.2"
+    "@capacitor/ios": "^8.6.2",
+    "tesseract.js": "^6.0.1",
+    "@tesseract.js-data/chi_sim": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
